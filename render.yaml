@@ -1,0 +1,35 @@
+services:
+  # 1. Backend (Telegram Bot)
+  - type: web
+    name: tg-mini-app-bot
+    env: node
+    plan: free
+    rootDir: bot
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: SUPERADMIN_ID
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+  # 2. Frontend (Mini App WebApp)
+  - type: static
+    name: tg-mini-app-webapp
+    env: static
+    rootDir: webapp
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    envVars:
+      - key: VITE_BACKEND_URL
+        sync: false
