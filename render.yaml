@@ -24,12 +24,12 @@ services:
         sync: false
 
   # 2. Frontend (Mini App WebApp)
-  - type: static
+  - type: web
     name: tg-mini-app-webapp
     env: static
     rootDir: webapp
     buildCommand: npm install && npm run build
-    publishDir: dist
+    staticPublishPath: dist
     envVars:
       - key: VITE_BACKEND_URL
         sync: false
