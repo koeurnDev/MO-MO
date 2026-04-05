@@ -59,7 +59,9 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
+const WEBHOOK_URL = process.env.WEBHOOK_URL; // Can be a secret path or full URL
+const EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+
 
 app.listen(PORT, async () => {
   console.log(`🚀 MO-MO Server listening on port ${PORT}`);
@@ -72,13 +74,29 @@ app.listen(PORT, async () => {
     }).catch(e => console.error('Menu button failed:', e.message));
   }
 
-  if (WEBHOOK_URL) {
-    app.use(bot.webhookCallback('/telegraf'));
-    await bot.telegram.setWebhook(`${WEBHOOK_URL}/telegraf`);
-    console.log('Bot set to Webhook mode');
-  } else { 
+  // 🛠️ Webhook & Polling Configuration
+  const isProduction = process.env.NODE_ENV === 'production' || !!EXTERNAL_URL;
+  
+  if (isProduction && EXTERNAL_URL) {
+    // Construct safe URL: Ensure it starts with https://, correct slashes
+    let baseUrl = EXTERNAL_URL.startsWith('http') ? EXTERNAL_URL : `https://${EXTERNAL_URL}`;
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+    
+    const secretPath = WEBHOOK_URL ? `/${WEBHOOK_URL.replace(/^\//, '')}` : '';
+    const fullPath = `${secretPath}/telegraf`.replace(/\/+/g, '/');
+    const finalWebhookUrl = `${baseUrl}${fullPath}`;
+
+    try {
+      app.use(bot.webhookCallback(fullPath));
+      await bot.telegram.setWebhook(finalWebhookUrl);
+      console.log(`✅ Bot set to Webhook mode at: ${finalWebhookUrl}`);
+    } catch (err) {
+      console.error(`⚠️ Webhook setup failed (${err.message}). Falling back to polling...`);
+      bot.launch().catch(e => console.error('Bot Polling fail:', e.message));
+    }
+  } else {
     bot.launch()
-      .then(() => console.log('Bot launched via Polling'))
-      .catch(err => console.error('Bot launch failed:', err)); 
+      .then(() => console.log('🚀 Bot launched via Polling'))
+      .catch(err => console.error('❌ Bot launch failed:', err.message)); 
   }
 });
