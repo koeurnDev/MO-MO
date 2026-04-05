@@ -20,3 +20,12 @@ x86/
 /webapp/node_modules/
 /bot/node_modules/
 /webapp/dist/
+*.db
+*.db-shm
+*.db-wal
+error_log.txt
+status.txt
+bot/result.txt
+bot/db_res.txt
+/bot/config/dev.json
+/bot/config/production.json

@@ -1,34 +1,102 @@
 import React from 'react';
+import { calculateBestDiscount, getDiscountedPrice } from '../utils/discountUtils';
 
-const ProductCard = ({ product, onAdd }) => {
-  const isOutOfStock = product.stock !== undefined && product.stock <= 0;
+const ProductCard = React.memo(({ product, onAdd, activeDiscounts = [] }) => {
+  const isOutOfStock = product.stock <= 0;
+
+  const handleClick = () => {
+    if (isOutOfStock) return;
+    const tg = window.Telegram?.WebApp;
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    onAdd(product);
+  };
+
+  const bestDiscount = calculateBestDiscount(product, activeDiscounts);
+  const discountedPriceValue = getDiscountedPrice(product, bestDiscount);
+  const isDiscounted = bestDiscount !== null;
 
   return (
-    <div className={`product-card-modern ${isOutOfStock ? 'out-of-stock' : ''}`}>
-      <div className="img-container" style={{ position: 'relative' }}>
-        <img src={product.image} alt={product.name} style={{ opacity: isOutOfStock ? 0.5 : 1, filter: isOutOfStock ? 'grayscale(80%)' : 'none' }} />
+    <div 
+      className={`card-sticker animate-in ${isOutOfStock ? 'out-of-stock-card' : ''}`} 
+      onClick={handleClick}
+      style={{ 
+        padding: 15, 
+        opacity: isOutOfStock ? 0.7 : 1, 
+        cursor: isOutOfStock ? 'default' : 'pointer',
+        textAlign: 'center'
+      }}
+    >
+      <div style={{ 
+        position: 'relative', 
+        borderRadius: 24, 
+        overflow: 'hidden', 
+        marginBottom: 15, 
+        background: '#fff5f7',
+        border: '3px solid white',
+        boxShadow: 'inset 0 0 20px rgba(255, 114, 160, 0.05)'
+      }}>
+        <img 
+          src={product.image || 'https://via.placeholder.com/200'} 
+          alt={product.name} 
+          style={{ width: '100%', height: 200, objectFit: 'cover' }}
+        />
+        
+        {/* 🏷️ Bubbly Price Badge */}
+        <div style={{ 
+          position: 'absolute', 
+          top: 10, 
+          right: 10, 
+          backgroundColor: '#ff1c1c', 
+          border: '2px solid white', 
+          color: 'white', 
+          padding: '6px 12px', 
+          borderRadius: 20, 
+          fontWeight: 900, 
+          fontSize: 16,
+          boxShadow: '0 4px 10px rgba(255, 28, 28, 0.3)'
+        }}>
+          {isDiscounted ? `$${discountedPriceValue}` : `$${product.price}`}
+        </div>
+
         {isOutOfStock && (
-          <div style={{ position: 'absolute', top: 12, right: 12, background: '#ef4444', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
-            អស់ស្តុក
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ background: '#1f2937', color: 'white', padding: '5px 12px', borderRadius: 12, fontWeight: 900, fontSize: 10 }}>OUT OF STOCK</span>
           </div>
         )}
       </div>
-      <div className="card-details">
-        <h3 className="product-name-modern">{product.name}</h3>
-        <div className="price-row">
-          <span className="price-modern">${product.price}</span>
-          <button 
-            className="add-btn" 
-            onClick={() => onAdd(product)}
-            disabled={isOutOfStock}
-            style={{ opacity: isOutOfStock ? 0.5 : 1, background: isOutOfStock ? '#e2e8f0' : undefined, color: isOutOfStock ? '#94a3b8' : undefined }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          </button>
+
+      <h3 style={{ 
+        margin: '0 0 5px', 
+        fontSize: 18, 
+        color: '#ff72a0', 
+        textShadow: '1px 1px 0 #fff',
+        fontFamily: "'Bubblegum Sans', cursive"
+      }}>
+        {product.name}
+      </h3>
+      
+      <p style={{ margin: '0 0 15px', fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
+        {product.category || 'Boutique Item'}
+      </p>
+
+      {!isOutOfStock ? (
+        <button 
+          className="btn-bubbly" 
+          style={{ width: '100%', padding: '10px', borderRadius: 25, fontSize: 14 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClick();
+          }}
+        >
+          🛒 បន្ថែមអីវ៉ាន់
+        </button>
+      ) : (
+        <div style={{ color: '#94a3b8', fontSize: 12, fontWeight: 800, padding: '10px' }}>
+          ទំនិញអស់ស្តុក
         </div>
-      </div>
+      )}
     </div>
   );
-};
+});
 
 export default ProductCard;

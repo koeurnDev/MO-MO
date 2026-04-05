@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Bubblegum+Sans&family=Inter:wght@400;700;900&family=Kantumruy+Pro:wght@400;700&display=swap');
+
+:root {
+  --brand-pink: #ff72a0;
+  --brand-red: #ff1c1c;
+  --brand-light: #fff5f7;
+  --text-main: #1f2937;
+  --glass: rgba(255, 255, 255, 0.85);
+  --pop-shadow: 0 8px 0 rgba(255, 114, 160, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', 'Kantumruy Pro', sans-serif;
+  background: linear-gradient(135deg, #fff5f7 0%, #ffe4e9 100%);
+  color: var(--text-main);
+  min-height: 100vh;
+}
+
+h1, h2, h3, .bubbly-text {
+  font-family: 'Bubblegum Sans', cursive;
+  letter-spacing: 1px;
+}
+
+/* 🎨 Bubbly Buttons - Glossy & Pop */
+.btn-bubbly {
+  background: linear-gradient(180deg, #ff9ebc 0%, #ff72a0 100%);
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 50px;
+  font-weight: 900;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #db2777, 0 12px 20px rgba(255, 114, 160, 0.3);
+  transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-transform: uppercase;
+}
+
+.btn-bubbly:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #db2777, 0 5px 10px rgba(255, 114, 160, 0.3);
+}
+
+/* 🏷️ Sticker Style Cards */
+.card-sticker {
+  background: white;
+  border: 4px solid #fff;
+  border-radius: 30px;
+  box-shadow: 0 15px 35px rgba(255, 114, 160, 0.15);
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.3s ease;
+}
+
+.card-sticker::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  background: url('https://img.icons8.com/emoji/48/star-emoji.png') no-repeat center;
+  background-size: contain;
+  opacity: 0.5;
+}
+
+/* 🛍️ Cart & Badges */
+.badge-pop {
+  background: var(--brand-red);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 900;
+  border: 2px solid white;
+}
+
+/* ⚡ Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.glass-panel {
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 24px;
+}

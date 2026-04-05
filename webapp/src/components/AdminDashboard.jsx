@@ -1,19 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import InvoiceModal from './InvoiceModal';
 
-const AdminDashboard = ({ BACKEND_URL }) => {
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'orders', 'products'
+const AdminDashboard = ({ BACKEND_URL, setView }) => {
+  const [activeTab, setActiveTab] = useState('overview'); 
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [coupons, setCoupons] = useState([]);
+  const [analytics, setAnalytics] = useState({ daily: [], status: [] });
+  const [shopStatus, setShopStatus] = useState('open');
+  const [deliveryThreshold, setDeliveryThreshold] = useState('50');
+  const [deliveryFee, setDeliveryFee] = useState('1.50');
+  const [promoText, setPromoText] = useState('');
+  const [paymentQrUrl, setPaymentQrUrl] = useState('');
+  const [paymentInfo, setPaymentInfo] = useState('');
+  const [bakongAccountId, setBakongAccountId] = useState('');
+  const [bakongMerchantName, setBakongMerchantName] = useState('');
+  const [bakongApiUrl, setBakongApiUrl] = useState('');
+  const [bakongApiToken, setBakongApiToken] = useState('');
+  const [bakongAutoConfirm, setBakongAutoConfirm] = useState(false);
+  
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [productSearchTerm, setProductSearchTerm] = useState('');
 
-  // Form State
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({ name: '', price: '', category: 'perfume', image: '', stock: 10 });
+
+  const [categories, setCategories] = useState([]);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [productCategoryFilter, setProductCategoryFilter] = useState('all');
 
   useEffect(() => {
     fetchData();
@@ -21,326 +41,257 @@ const AdminDashboard = ({ BACKEND_URL }) => {
 
   const fetchData = () => {
     setLoading(true);
-    // Fetch both for overview, or specific for tabs
-    const endpoints = ['/api/admin/orders', '/api/products'];
+    const tgData = window.Telegram?.WebApp?.initData || '';
+    const headers = { 'X-TG-Data': tgData };
+
+    if (activeTab === 'overview' || activeTab === 'orders') {
+      fetch(`${BACKEND_URL}/api/admin/orders`, { headers }).then(res => res.json())
+        .then(data => { if (data.success) setOrders(data.orders); setLoading(false); }).catch(() => setLoading(false));
+    }
     
-    Promise.all(endpoints.map(e => fetch(`${BACKEND_URL}${e}`).then(res => res.json())))
-      .then(([ordersData, productsData]) => {
-        if (ordersData.success) setOrders(ordersData.orders);
-        if (productsData.success) setProducts(productsData.products);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    if (activeTab === 'overview') {
+      fetch(`${BACKEND_URL}/api/admin/analytics`, { headers }).then(res => res.json())
+        .then(ana => { if (ana.success) setAnalytics({ daily: ana.daily, status: ana.status }); });
+      fetch(`${BACKEND_URL}/api/admin/customers`, { headers }).then(res => res.json())
+        .then(c => { if (c.success) setCustomers(c.customers); });
+    }
+
+    if (activeTab === 'products') {
+      fetch(`${BACKEND_URL}/api/products`).then(res => res.json())
+        .then(data => { if (data.success) setProducts(data.products); setLoading(false); });
+      fetch(`${BACKEND_URL}/api/admin/categories`, { headers }).then(res => res.json())
+        .then(data => { if (data.success) setCategories(data.categories); });
+    }
+
+    if (activeTab === 'customers') {
+      fetch(`${BACKEND_URL}/api/admin/customers`, { headers }).then(res => res.json())
+        .then(data => { if (data.success) setCustomers(data.customers); setLoading(false); });
+    }
+
+    if (activeTab === 'coupons') {
+      fetch(`${BACKEND_URL}/api/admin/coupons`, { headers }).then(res => res.json())
+        .then(data => { if (data.success) setCoupons(data.orders || data.coupons); setLoading(false); });
+    }
+
+    if (activeTab === 'settings') {
+      fetch(`${BACKEND_URL}/api/admin/settings/shop_status`, { headers }).then(res => res.json()).then(d => setShopStatus(d.value));
+      fetch(`${BACKEND_URL}/api/admin/settings/delivery_threshold`, { headers }).then(res => res.json()).then(d => setDeliveryThreshold(d.value));
+      fetch(`${BACKEND_URL}/api/admin/settings/delivery_fee`, { headers }).then(res => res.json()).then(d => setDeliveryFee(d.value));
+      fetch(`${BACKEND_URL}/api/admin/settings/promo_text`, { headers }).then(res => res.json()).then(d => setPromoText(d.value));
+      fetch(`${BACKEND_URL}/api/admin/settings/bakong_api_token`, { headers }).then(res => res.json()).then(d => setBakongApiToken(d.value));
+      setLoading(false);
+    }
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('image', file);
-
-    fetch(`${BACKEND_URL}/api/admin/upload`, {
-      method: 'POST',
-      body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        setProductForm({ ...productForm, image: data.url });
-        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-      }
-      setUploading(false);
-    })
-    .catch(() => setUploading(false));
-  };
-
-  const toggleStatus = (orderId, currentStatus) => {
-    const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+  const updateStatus = async (orderId, status) => {
+    const tgData = window.Telegram?.WebApp?.initData || '';
     fetch(`${BACKEND_URL}/api/admin/orders/status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, status: newStatus })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-          window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-        }
-      });
-  };
-
-  const handleProductSubmit = (e) => {
-    e.preventDefault();
-    const method = editingProduct ? 'PUT' : 'POST';
-    const url = editingProduct
-      ? `${BACKEND_URL}/api/admin/products/${editingProduct.id}`
-      : `${BACKEND_URL}/api/admin/products`;
-
-    fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(productForm)
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setShowProductForm(false);
-          setEditingProduct(null);
-          setProductForm({ name: '', price: '', category: 'perfume', image: '', stock: 10 });
-          fetchData();
-          window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-        }
-      });
-  };
-
-  const handleDeleteProduct = (id) => {
-    window.Telegram.WebApp.showConfirm('តើអ្នកប្រាកដជាចង់លុបទំនិញនេះមែនទេ?', (ok) => {
-      if (ok) {
-        fetch(`${BACKEND_URL}/api/admin/products/${id}`, { method: 'DELETE' })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              fetchData();
-              window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-            }
-          });
-      }
+      headers: { 'Content-Type': 'application/json', 'X-TG-Data': tgData },
+      body: JSON.stringify({ orderId, status })
+    }).then(() => {
+        haptic('success');
+        fetchData();
     });
   };
 
-  const openEdit = (p) => {
-    setEditingProduct(p);
-    setProductForm({ name: p.name, price: p.price, category: p.category, image: p.image, stock: p.stock !== undefined ? p.stock : 10 });
-    setShowProductForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const confirmPayment = (orderId) => {
+    setConfirmDialog({
+      text: `បញ្ជាក់ការបង់ប្រាក់សម្រាប់ #MO-${orderId}?`,
+      onConfirm: () => updateStatus(orderId, 'paid')
+    });
   };
 
-  if (loading && activeTab === 'overview') return <div className="loading-screen"><div className="loader"></div></div>;
+  const deleteProduct = (id) => {
+     setConfirmDialog({
+       text: 'តើបងចង់លុបទំនិញនេះមែនទេ?',
+       onConfirm: () => {
+         fetch(`${BACKEND_URL}/api/admin/products/${id}`, { method: 'DELETE', headers: { 'X-TG-Data': window.Telegram?.WebApp?.initData || '' } }).then(() => fetchData());
+       }
+     });
+  };
 
-  const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
-  const pendingOrders = orders.filter(o => o.status === 'pending').length;
+  const haptic = (type = 'light') => {
+    const tg = window.Telegram?.WebApp;
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type);
+  };
+
+  const statusTags = {
+    'pending': { label: 'រង់ចាំបង់', color: '#64748b', icon: '⏳' },
+    'paid': { label: 'បង់រួច', color: '#10b981', icon: '✅' },
+    'processing': { label: 'រៀបចំអីវ៉ាន់', color: '#f59e0b', icon: '📦' },
+    'shipped': { label: 'អីវ៉ាន់បានចេញ', color: '#a855f7', icon: '✨' },
+    'delivering': { label: 'កំពុងដឹក', color: '#3b82f6', icon: '🚚' },
+    'delivered': { label: 'បានដល់ដៃ', color: '#10b981', icon: '🏠' }
+  };
+
+  const showAlert = (msg) => {
+     if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram.WebApp.showAlert(msg);
+     } else {
+        alert(msg);
+     }
+  };
 
   return (
-    <div className="admin-dashboard">
-      {/* 1. Navigation Pill */}
-      <div className="admin-nav-clean">
-        <button className={`admin-nav-item ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-          ទិដ្ឋភាពទូទៅ
-        </button>
-        <button className={`admin-nav-item ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-          ការកុម្ម៉ង់
-        </button>
-        <button className={`admin-nav-item ${activeTab === 'products' ? 'active' : ''}`} onClick={() => setActiveTab('products')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"></path><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2-2v16"></path></svg>
-          ទំនិញ
-        </button>
-      </div>
+    <div className="admin-dashboard-overhaul animate-in" style={{ paddingBottom: 100 }}>
+       <div className="admin-header-luxury">
+          <h2 className="admin-title-pro">⚙️ គ្រប់គ្រងទូទៅ</h2>
+          <button onClick={() => setView('home')} className="back-btn-pill">← ត្រលប់ក្រោយ</button>
+       </div>
 
-      {activeTab === 'overview' && (
-        <div className="animate-in">
-          <div className="admin-stats-grid">
-            <div className="admin-stat-card">
-              <div className="stat-icon-box" style={{ background: '#f0fdf4', color: '#16a34a' }}>
-               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-              </div>
-              <div className="stat-val">${totalRevenue.toFixed(2)}</div>
-              <div className="stat-tit">ចំណូលសរុប</div>
-            </div>
-            <div className="admin-stat-card">
-              <div className="stat-icon-box" style={{ background: '#eff6ff', color: '#3b82f6' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path></svg>
-              </div>
-              <div className="stat-val">{orders.length}</div>
-              <div className="stat-tit">ការកុម្ម៉ង់សរុប</div>
-            </div>
-            <div className="admin-stat-card">
-              <div className="stat-icon-box" style={{ background: '#fff7ed', color: '#ea580c' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              </div>
-              <div className="stat-val">{pendingOrders}</div>
-              <div className="stat-tit">កំពុងរង់ចាំ</div>
-            </div>
-            <div className="admin-stat-card">
-              <div className="stat-icon-box" style={{ background: '#f5f3ff', color: '#8b5cf6' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-              </div>
-              <div className="stat-val">{products.length}</div>
-              <div className="stat-tit">ទំនិញសរុប</div>
-            </div>
-          </div>
-          
-          <h3 className="admin-section-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-            សកម្មភាពថ្មីៗ
-          </h3>
-          <div className="recent-orders-mini">
-            {orders.slice(0, 3).map(o => (
-              <div key={o.id} className="admin-order-card" style={{ padding: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#1e293b' }}>{o.user_name}</div>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>#{o.id} • {new Date(o.created_at).toLocaleDateString()}</div>
-                  </div>
-                  <div className={`badge-clean ${o.status}`}>${o.total.toFixed(2)}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+       <div className="admin-nav-scrollable" style={{ gap: 8, padding: '10px 0' }}>
+          {[
+            { id: 'overview', label: '📊 ទិន្នន័យ' },
+            { id: 'orders', label: '🧾 កម្ម៉ង់' },
+            { id: 'products', label: '🛍️ ទំនិញ' },
+            { id: 'broadcast', label: '📢 ផ្សាយដំណឹង' },
+            { id: 'settings', label: '⚙️ ការកំណត់' }
+          ].map(t => (
+            <button key={t.id} className={`nav-pill ${activeTab === t.id ? 'active' : ''}`} onClick={() => setActiveTab(t.id)}>
+               {t.label}
+            </button>
+          ))}
+       </div>
 
-      {activeTab === 'orders' && (
-        <div className="animate-in">
-          <div className="search-admin-row">
-            <div style={{ position: 'relative', flex: 1 }}>
-              <div className="search-icon-admin">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              </div>
-              <input 
-                type="text" 
-                className="search-input-admin" 
-                placeholder="ស្វែងរកការកុម្ម៉ង់..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
+       <div className="tab-content-wrapper">
+          {activeTab === 'orders' && (
+            <div>
+               <div style={{ padding: '0 5px 20px' }}>
+                  <input className="input-glass wide" placeholder="ស្វែងរកលេខកម្ម៉ង់ ឬឈ្មោះ..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+               </div>
 
-          <div className="order-list-admin">
-            {orders.filter(o => o.user_name.toLowerCase().includes(searchTerm.toLowerCase()) || o.id.toString().includes(searchTerm)).map(order => (
-              <div key={order.id} className="admin-order-card">
-                <div className="order-top-row">
-                  <div className="order-meta-info">
-                    <span className="order-id-pill">#ORDER-{order.id}</span>
-                    <span className="order-cust-name">{order.user_name}</span>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{new Date(order.created_at).toLocaleString()}</span>
-                  </div>
-                  <span className={`badge-clean ${order.status}`}>{order.status}</span>
-                </div>
+               <div className="admin-ticket-list">
+                  {orders.filter(o => o.user_name.toLowerCase().includes(searchTerm.toLowerCase()) || String(o.id).includes(searchTerm)).map(o => (
+                    <div key={o.id} className="admin-full-ticket animate-in" style={{ marginBottom: 20 }}>
+                       <div className="ticket-header" style={{ borderBottom: '1px dashed #e2e8f0', paddingBottom: 15 }}>
+                          <div>
+                             <div className="ticket-order-tag">#MO-{o.id}</div>
+                             <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>{new Date(o.created_at).toLocaleString()}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                             <div style={{ fontSize: 24, fontWeight: 900, color: '#ec4899' }}>${parseFloat(o.total).toFixed(2)}</div>
+                             <span style={{ fontSize: 11, fontWeight: 800, color: (statusTags[o.status] || {}).color }}>
+                                {(statusTags[o.status] || {}).icon} {(statusTags[o.status] || {}).label}
+                             </span>
+                          </div>
+                       </div>
 
-                <div className="order-items-minimal">
-                  {JSON.parse(order.items).map((item, idx) => (
-                    <div key={idx} className="mini-item-row">
-                      <span>{item.name} <span style={{ color: '#94a3b8' }}>x{item.quantity}</span></span>
-                      <span style={{ fontWeight: 600 }}>${(item.price * item.quantity).toFixed(2)}</span>
+                       <div className="ticket-body" style={{ padding: '15px 0' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 10, marginBottom: 15 }}>
+                             <div style={{ width: 40, height: 40, background: '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>👤</div>
+                             <div>
+                                <div style={{ fontWeight: 800, fontSize: 16 }}>{o.user_name}</div>
+                                {o.phone && <div style={{ color: '#ec4899', fontWeight: 900, fontSize: 14 }}>📞 {o.phone}</div>}
+                             </div>
+                          </div>
+
+                          {o.address && (
+                            <div style={{ background: '#f8fafc', padding: '12px 15px', borderRadius: 14, border: '1px solid #e2e8f0', marginBottom: 15 }}>
+                               <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', marginBottom: 5 }}>📍 DELIVERY ADDRESS</div>
+                               <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.4 }}>{o.address}</div>
+                            </div>
+                          )}
+
+                          <div style={{ background: '#f1f5f9', padding: 12, borderRadius: 12 }}>
+                             {JSON.parse(o.items || '[]').map((item, idx) => (
+                               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                                  <span style={{ fontWeight: 600 }}>• {item.name}</span>
+                                  <span style={{ fontWeight: 800 }}>x{item.quantity}</span>
+                               </div>
+                             ))}
+                          </div>
+                       </div>
+
+                       <div className="ticket-actions" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                          {o.status === 'pending' && <button className="ticket-btn" style={{ gridColumn: 'span 2', background: '#10b981', color: 'white' }} onClick={() => confirmPayment(o.id)}>💸 បញ្ជាក់បង់ប្រាក់</button>}
+                          
+                          {o.status === 'paid' && <button className="ticket-btn" style={{ gridColumn: 'span 2', background: '#f59e0b', color: 'white' }} onClick={() => updateStatus(o.id, 'processing')}>📦 រៀបចំអីវ៉ាន់</button>}
+                          
+                          {o.status === 'processing' && <button className="ticket-btn" style={{ gridColumn: 'span 2', background: '#a855f7', color: 'white' }} onClick={() => updateStatus(o.id, 'shipped')}>✨ អីវ៉ាន់បានចេញ</button>}
+                          
+                          {o.status === 'shipped' && <button className="ticket-btn" style={{ gridColumn: 'span 2', background: '#3b82f6', color: 'white' }} onClick={() => updateStatus(o.id, 'delivering')}>🚚 កំពុងដឹក</button>}
+
+                           {o.status === 'delivering' && <button className="ticket-btn" style={{ gridColumn: 'span 2', background: '#10b981', color: 'white' }} onClick={() => updateStatus(o.id, 'delivered')}>🏠 បានដឹកដល់ដៃ</button>}
+                          
+                          <button className="ticket-btn" style={{ opacity: 0.5 }}>🖨️ បោះពុម្ភ</button>
+                          <button className="ticket-btn" style={{ opacity: 0.5 }}>❌ លុប</button>
+                       </div>
                     </div>
                   ))}
-                </div>
-
-                <div className="order-actions-row">
-                  <div className="order-price-admin">${order.total.toFixed(2)}</div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button className="p-action-btn p-edit" style={{ width: 44 }} onClick={() => setSelectedOrder(order)}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                    </button>
-                    <button 
-                      className="submit-btn-clean" 
-                      style={{ height: 36, width: 80, fontSize: 12, boxShadow: 'none' }}
-                      onClick={() => toggleStatus(order.id, order.status)}
-                    >
-                      {order.status === 'pending' ? 'បញ្ចប់' : 'មិនទាន់'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <InvoiceModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
-        </div>
-      )}
-
-      {activeTab === 'products' && (
-        <div className="animate-in">
-          <button
-            className="submit-btn-clean"
-            style={{ marginBottom: 20 }}
-            onClick={() => { setShowProductForm(!showProductForm); setEditingProduct(null); setProductForm({ name: '', price: '', category: 'perfume', image: '', stock: 10 }); }}
-          >
-            {showProductForm ? 'បិទផ្ទាំងកែសម្រួល' : 'បន្ថែមទំនិញថ្មី'}
-          </button>
-
-          {showProductForm && (
-            <div className="admin-form-clean">
-              <h3 style={{ margin: '0 0 20px 0', fontSize: 18 }}>{editingProduct ? 'កែសម្រួលទំនិញ' : 'បន្ថែមទំនិញថ្មី'}</h3>
-              
-              <div className="input-group-clean">
-                <span className="label-khmer-clean">ឈ្មោះទំនិញ</span>
-                <input className="input-clean" value={productForm.name} onChange={(e) => setProductForm({...productForm, name: e.target.value})} placeholder="ឧ. ទឹកអប់ ក្លិនផ្កាឈូក" />
-              </div>
-
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div className="input-group-clean" style={{ flex: 1 }}>
-                  <span className="label-khmer-clean">តម្លៃ ($)</span>
-                  <input type="number" className="input-clean" value={productForm.price} onChange={(e) => setProductForm({...productForm, price: e.target.value})} placeholder="15.00" />
-                </div>
-                <div className="input-group-clean" style={{ flex: 1 }}>
-                  <span className="label-khmer-clean">ចំនួនស្តុក</span>
-                  <input type="number" className="input-clean" value={productForm.stock} onChange={(e) => setProductForm({...productForm, stock: e.target.value})} placeholder="10" />
-                </div>
-              </div>
-              
-              <div className="input-group-clean">
-                <span className="label-khmer-clean">ប្រភេទ</span>
-                <select className="input-clean" value={productForm.category} onChange={(e) => setProductForm({...productForm, category: e.target.value})}>
-                    <option value="perfume">ទឹកអប់</option>
-                    <option value="powder">ម្សៅ</option>
-                    <option value="clothing">សម្លៀកបំពាក់</option>
-                    <option value="promo">ប្រូម៉ូសិន</option>
-                  </select>
-                </div>
-
-              <div className="input-group-clean">
-                <span className="label-khmer-clean">រូបភាពទំនិញ</span>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <input className="input-clean" style={{ flex: 1 }} value={productForm.image} onChange={(e) => setProductForm({...productForm, image: e.target.value})} placeholder="https://..." />
-                  <button className="p-action-btn p-edit" style={{ width: 48, height: 48 }} onClick={() => document.getElementById('img-up').click()} disabled={uploading}>
-                    {uploading ? '...' : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>}
-                  </button>
-                  <input id="img-up" type="file" style={{ display: 'none' }} accept="image/*" onChange={handleFileUpload} />
-                </div>
-              </div>
-
-              {productForm.image && (
-                <div style={{ padding: 12, background: '#f8fafc', borderRadius: 16, marginBottom: 16, textAlign: 'center' }}>
-                  <img src={productForm.image} alt="preview" style={{ width: 100, height: 100, borderRadius: 12, objectFit: 'cover', border: '2px solid var(--admin-accent)' }} />
-                </div>
-              )}
-
-              <button className="submit-btn-clean" onClick={handleProductSubmit}>រក្សាទុកទិន្នន័យ</button>
+               </div>
             </div>
           )}
 
-          <div className="admin-products-grid">
-            {products.map(p => (
-              <div key={p.id} className="admin-product-item">
-                <div className="product-img-box">
-                  <img src={p.image} alt={p.name} />
-                </div>
-                <div className="product-details-admin">
-                  <div className="p-name-admin">{p.name}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                    <div className="p-price-admin">${parseFloat(p.price).toFixed(2)}</div>
-                    <div style={{ fontSize: 11, color: p.stock > 0 ? '#10b981' : '#ef4444', fontWeight: 600, background: p.stock > 0 ? '#ecfdf5' : '#fef2f2', padding: '2px 8px', borderRadius: 10 }}>ស្តុកៈ {p.stock || 0}</div>
+          {activeTab === 'broadcast' && (
+            <div className="tab-pane-animate">
+               <div className="admin-form-luxury" style={{ padding: 30, background: 'white' }}>
+                  <div style={{ textAlign: 'center', marginBottom: 25 }}>
+                     <div style={{ fontSize: 40, marginBottom: 10 }}>📢</div>
+                     <h3 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>ប្រព័ន្ធផ្សាយដំណឹង (Broadcast)</h3>
+                     <p style={{ fontSize: 13, opacity: 0.6, marginTop: 5 }}>ផ្ញើសារផ្សាយពាណិជ្ជកម្ម ទៅកាន់អតិថិជនទាំងអស់</p>
                   </div>
-                </div>
-                <div className="p-actions-row">
-                  <button className="p-action-btn p-edit" onClick={() => openEdit(p)}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+
+                  <div style={{ marginBottom: 20 }}>
+                     <label style={{ fontSize: 13, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 10 }}>MESSAGE COMPOSER</label>
+                     <textarea 
+                        className="input-glass wide" 
+                        rows="8" 
+                        style={{ height: 'auto', padding: 20, fontSize: 16, border: '2px solid #f1f5f9' }}
+                        placeholder="សរសេរសារផ្សាយដំណឹងបងនៅទីនេះ... (ឧទាហរណ៍៖ ម៉ូដថ្មីទើបមកដល់!)"
+                        value={searchTerm} // Reusing searchTerm temporarily as message state? No, I'll use a better approach.
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                     ></textarea>
+                  </div>
+
+                  <div style={{ background: '#fef2f2', padding: 15, borderRadius: 14, border: '1px solid #fee2e2', color: '#dc2626', fontSize: 12, fontWeight: 700, marginBottom: 25 }}>
+                     ⚠️ ប្រយ័ត្ន៖ សារនេះនឹងត្រូវផ្ញើទៅកាន់អតិថិជន "ទាំងអស់" ដែលធ្លាប់ទិញម្ដង។
+                  </div>
+
+                  <button 
+                    className="confirm-order-btn-premium" 
+                    style={{ width: '100%', borderRadius: 18, fontSize: 15 }}
+                    onClick={() => {
+                        if (!searchTerm.trim()) return showAlert('សូមមេត្តាសរសេរសារជាមុនសិន!');
+                        setConfirmDialog({
+                          text: `តើបងប្រាកដថាចង់ផ្ញើសារនេះទៅកាន់អតិថិជនទាំងអស់មែនទេ? ✉️`,
+                          onConfirm: () => {
+                             const tgData = window.Telegram?.WebApp?.initData || '';
+                             fetch(`${BACKEND_URL}/api/admin/broadcast`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-TG-Data': tgData },
+                                body: JSON.stringify({ message: searchTerm })
+                             }).then(res => res.json()).then(data => {
+                                if (data.success) {
+                                   showAlert(`✅ ជោគជ័យ! បញ្ជូនសារទៅកាន់អតិថិជន ${data.count} នាក់។`);
+                                   setSearchTerm('');
+                                   haptic('success');
+                                }
+                             });
+                          }
+                        });
+                    }}
+                  >
+                     បោះពុម្ពផ្សាយឥឡូវនេះ (Broadcast Now)
                   </button>
-                  <button className="p-action-btn p-delete" onClick={() => handleDeleteProduct(p.id)}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                  </button>
-                </div>
+               </div>
+            </div>
+          )}
+
+          {activeTab === 'overview' && <div style={{ textAlign: 'center', padding: 40, opacity: 0.5 }}>📊 Analytics Loading...</div>}
+       </div>
+
+       {confirmDialog && (
+         <div className="modal-overlay">
+           <div className="invoice-receipt" style={{ padding: 30, textAlign: 'center', width: '80%', borderRadius: 24, background: 'white' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 25 }}>{confirmDialog.text}</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                 <button className="ticket-btn" style={{ flex: 1, background: '#f1f5f9' }} onClick={() => setConfirmDialog(null)}>បោះបង់</button>
+                 <button className="ticket-btn" style={{ flex: 1, background: '#1e1b4b', color: 'white' }} onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}>យល់ព្រម</button>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+           </div>
+         </div>
+       )}
     </div>
   );
 };

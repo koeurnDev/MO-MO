@@ -1,75 +1,93 @@
-# Telegram Mini App (TMA) - Complete Boilerplate
+# MO-MO Telegram Mini App - Technical Documentation 🚀
 
-This project contains a fully functional Telegram Mini App ecosystem, including a Node.js bot and a React-based frontend.
+Welcome to the **MO-MO** project—a premium, high-end e-commerce platform built as a Telegram Mini App. This project features a sophisticated React frontend (WebApp) and a robust Node.js backend (Bot API).
 
-## 📁 Project Structure
+---
 
-- `/bot`: Node.js Express server using `Telegraf`.
-- `/webapp`: React frontend built with `Vite` and `Telegram WebApp API`.
+## 🏗 Project Architecture
 
-## 🚀 Getting Started
+- **`/bot`**: Node.js & Express server handling the Telegram Bot, REST API, Database interactions (PostgreSQL), and Image Management (Cloudinary).
+- **`/webapp`**: Vite + React frontend providing the premium customer interface and Admin Dashboard.
 
-### 1. Bot Setup (via @BotFather)
-1. Go to [@BotFather](https://t.me/BotFather) on Telegram.
-2. Create a new bot using `/newbot` and save your `BOT_TOKEN`.
-3. Set your Bot's Menu Button or Keyboard Button to your WebApp URL (see Deployment below).
+---
 
-### 2. Configuration
-- **Bot**: Copy `bot/.env.example` to `bot/.env` and fill in your `BOT_TOKEN` and `WEBAPP_URL`.
-- **WebApp**: No environment variables needed for this basic setup, but ensure your bot's `WEBAPP_URL` matches your frontend URL.
+## 🛠 Prerequisites
 
-### 3. Local Development
+Before starting, ensure you have the following ready:
+1. **Node.js** (v18+ recommended)
+2. **Telegram Bot Token** (From [@BotFather](https://t.me/botfather))
+3. **Cloudinary Account** (For image hosting)
+4. **Neon.tech Account** (For PostgreSQL database)
+5. **Render.com Account** (For production deployment)
 
-#### A. Run the WebApp
-```bash
-cd webapp
-npm run dev
-```
-The app will typically run on `http://localhost:5173`.
+---
 
-#### B. Expose to HTTPS (Required by Telegram)
-Use a tool like `ngrok` or `localtunnel` to create an HTTPS tunnel to your local React dev server.
-```bash
-ngrok http 5173
-```
-Copy the `https://...` URL and update your `bot/.env` with it.
+## ⚙️ Setup Instructions
 
-#### C. Run the Bot
+### 1. Backend (`/bot`)
 ```bash
 cd bot
+npm install
+# Create a .env file based on .env.example
 npm start
 ```
+**Required `.env` Variables:**
+| Variable | Description |
+|---|---|
+| `BOT_TOKEN` | Your Telegram Bot Token |
+| `DATABASE_URL` | Neon PostgreSQL Connection String |
+| `SUPERADMIN_ID` | Your Telegram User ID (for Admin access) |
+| `WEBAPP_URL` | The URL where your frontend is hosted |
+| `WEBHOOK_URL` | (Production) Your backend URL for Telegram webhooks |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary Cloud Name |
+| `CLOUDINARY_API_KEY` | Cloudinary API Key |
+| `CLOUDINARY_API_SECRET` | Cloudinary API Secret |
+
+### 2. Frontend (`/webapp`)
+```bash
+cd webapp
+npm install
+# Create a .env file based on .env.example
+npm run dev
+```
+**Required `.env` Variables:**
+| Variable | Description |
+|---|---|
+| `VITE_BACKEND_URL` | The URL of your backend API |
 
 ---
 
-## 🛠 Features
+## 💾 Maintenance & Operations
 
-### Telegram Integration
-- **User Info**: Accesses `ID`, `username`, and `photo_url` via `window.Telegram.WebApp.initDataUnsafe`.
-- **Haptic Feedback**: Triggers tactile response on button clicks.
-- **Confirmation Dialogs**: Native Telegram UI for action confirmation.
-- **Main Button Integration**: Example of sending data back to the bot chat.
+### 1. Database Management
+- The system automatically initializes tables on startup.
+- **Stock Management**: Inventory is deducted automatically on successful orders.
+- **Cleanup**: When a product is deleted from the Admin Panel, the server automatically removes the associated image from Cloudinary to save storage.
 
-### Payments (Simulation)
-- Includes placeholder functions (`handleBuyNow`) explaining where backend verification would occur (Stripe/PayPal webhooks).
+### 2. Security Configuration
+- **Admin Protection**: Only the user matching `SUPERADMIN_ID` can access the `/admin` section. 
+- **Signature Verification**: Every admin request is cryptographically verified using Telegram's `initData` signature.
+- **Secure Headers**: The server uses `Helmet` to protect against common web attacks.
 
----
-
-## 🌎 Deployment Notes
-
-### WebApp Hosting
-- Host the `webapp` on any static provider (Vercel, Netlify, or your own server).
-- MUST be served over **HTTPS**.
-
-### Bot Hosting
-- Host the `bot` on a Node.js-capable server (Heroku, Render, DigitalOcean).
-- Use a **Webhook** instead of long polling for production stability (`bot/index.js` has comments for this).
+### 3. Deployment (Render)
+- **Backend Service**: Set up as a Node.js Web Service.
+- **Frontend Service**: Set up as a Static Site.
+- **Webhooks**: Clear the `WEBHOOK_URL` for local polling and set it for production webhook mode.
 
 ---
 
-## 🔗 Connecting Bot & WebApp
-In `@BotFather`:
-1. Use `/setmenubutton`.
-2. Select your bot.
-3. Provide your HTTPS WebApp URL.
-4. Now, your bot will have a button that opens the Mini App inside Telegram!
+## 💎 Design System & UX
+- **Typography**: Outfit (Display), Inter (Body), Kantumruy Pro (Khmer).
+- **Aesthetics**: Premium Light Mode with Glassmorphism and Physics-based micro-interactions (Magnetic buttons, 3D Tilt).
+- **Loading UX**: Integrated Skeleton Screens for perceived performance.
+
+---
+
+## 📈 Future Scalability
+- **Adding Categories**: Simply add a new category name in the `db.js` initial seeds or via the Admin Panel.
+- **Multi-Admin**: Update the `isAdmin` middleware to check an array of IDs instead of a single `SUPERADMIN_ID`.
+- **Integrations**: The modular API structure allows for easy integration with external payment gateways or shipping providers.
+
+---
+
+**Crafted with pride by Antigravity (Senior UXUI & Full-Stack Developer)**
