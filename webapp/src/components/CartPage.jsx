@@ -166,27 +166,27 @@ const CartPage = ({
                 const dPrice = best ? getDiscountedPrice(item, best) : null;
                 return (
                   <div key={item.id} className="flex justify-between items-baseline text-sm">
-                    <div className="text-muted font-bold truncate max-w-[140px] uppercase tracking-tighter">{item.name} x {item.quantity}</div>
-                    <div className="font-black text-bold tabular-nums">
-                      {dPrice ? `$${(dPrice * item.quantity).toFixed(2)}` : `$${(item.price * item.quantity).toFixed(2)}`}
-                    </div>
-                  </div>
-                );
-              })}
-              <div className="flex justify-between items-center text-sm">
-                <div className="text-muted font-bold uppercase tracking-tighter">{t('delivery_label')}</div>
-                <div className="font-black text-bold tabular-nums">${appliedFee.toFixed(2)}</div>
+                <div className="text-bold font-bold truncate max-w-[140px] tracking-tight">{item.name} x {item.quantity}</div>
+                <div className="font-black text-bold tabular-nums">
+                  {dPrice ? `$${(dPrice * item.quantity).toFixed(2)}` : `$${(item.price * item.quantity).toFixed(2)}`}
+                </div>
               </div>
-            </div>
-            <div className="flex justify-between items-center mb-8">
-              <span className="text-lg font-black uppercase">{lang === 'kh' ? 'សរុប:' : 'Total:'}</span>
-              <span className="text-2xl font-black text-primary-accent tabular-nums">${finalTotal.toFixed(2)}</span>
-            </div>
-            <button
-              className={`w-full py-4 flex items-center justify-center gap-3 bg-bold text-white rounded-2xl font-black uppercase tracking-widest transition-all ${isPlacingOrder ? 'opacity-75 cursor-wait' : 'hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]'} ${(step === 2 && (!isPhoneValid || !isAddressValid)) ? 'opacity-50 grayscale' : ''}`}
-              onClick={handlePrimaryAction}
-              disabled={isPlacingOrder || totalItemsCount === 0}
-            >
+            );
+          })}
+          <div className="flex justify-between items-center text-sm">
+            <div className="text-bold font-bold uppercase tracking-tight">{t('delivery_label')}</div>
+            <div className="font-black text-bold tabular-nums">${appliedFee.toFixed(2)}</div>
+          </div>
+        </div>
+        <div className="flex justify-between items-center mb-8">
+          <span className="text-lg font-black uppercase text-bold">{lang === 'kh' ? 'សរុប:' : 'Total:'}</span>
+          <span className="text-2xl font-black text-primary-accent tabular-nums">${finalTotal.toFixed(2)}</span>
+        </div>
+        <button
+          className={`w-full py-4 flex items-center justify-center gap-3 bg-primary-accent text-white rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all ${isPlacingOrder ? 'opacity-75 cursor-wait' : 'hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]'} ${(step === 2 && (!isPhoneValid || !isAddressValid)) ? 'opacity-50 grayscale' : ''}`}
+          onClick={handlePrimaryAction}
+          disabled={isPlacingOrder || totalItemsCount === 0}
+        >
               {isPlacingOrder ? (
                 <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
               ) : step === 1 ? (
