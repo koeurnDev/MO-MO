@@ -49,9 +49,10 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "https://telegram.org", "https://*.telegram.org"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "https://images.unsplash.com", "https://*.telegram.org"],
-      connectSrc: ["'self'", "https://*.telegram.org", process.env.VITE_BACKEND_URL || "https://tg-mini-app-bot.onrender.com"],
+      connectSrc: ["'self'", "https://*.telegram.org", process.env.VITE_BACKEND_URL || "https://tg-mini-app-bot.onrender.com", "http://localhost:3005"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
+      frameAncestors: ["'self'", "https://t.me", "https://web.telegram.org"],
       upgradeInsecureRequests: [],
     },
   },
@@ -137,10 +138,12 @@ app.post('/api/admin/orders/status', isAdmin, adminController.updateOrderStatus)
 
 // --- Global Error Handler (Safety Net) ---
 app.use((err, req, res, next) => {
-  console.error('🔥 Global App Error:', err.stack);
+  const isDev = process.env.NODE_ENV === 'development';
+  console.error('🔥 Global App Error:', isDev ? err.stack : err.message);
+  
   res.status(err.status || 500).json({
     success: false,
-    error: err.message || 'Internal Server Error'
+    error: isDev ? err.message : 'An internal processing error occurred'
   });
 });
 

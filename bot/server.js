@@ -16,15 +16,18 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const validateEnv = () => {
   const required = [
-    'BOT_TOKEN', 'DATABASE_URL', 'REDIS_URL', 'SECURITY_PEPPER',
-    'WEBAPP_URL', 'VITE_BACKEND_URL', 'SUPERADMIN_ID',
-    'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN',
+    'BOT_TOKEN', 'DATABASE_URL', 
+    'WEBAPP_URL', 'SUPERADMIN_ID',
     'SESSION_SECRET'
   ];
   const missing = required.filter(k => !process.env[k]);
   if (missing.length > 0) {
     console.error('🔴 CRITICAL: Missing required environment variables:', missing.join(', '));
     process.exit(1);
+  }
+  
+  if (process.env.SESSION_SECRET?.length < 32) {
+    console.warn('⚠️ WARNING: SESSION_SECRET is too short (< 32 chars). Increased risk of brute force.');
   }
 };
 

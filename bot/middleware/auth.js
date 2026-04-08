@@ -13,7 +13,9 @@ const SESSION_EXPIRY = '2h'; // Short sessions for maximum safety
 const checkBypass = () => {
   const isProd = process.env.NODE_ENV === 'production';
   const isBypassEnabled = process.env.DEBUG_ADMIN_BYPASS === 'true';
-  return !isProd && isBypassEnabled;
+  // 🛡 Security: Bypass MUST be disabled in production regardless of flag
+  if (isProd) return false;
+  return isBypassEnabled;
 };
 
 /**
