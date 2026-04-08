@@ -21,9 +21,9 @@ const validate = (req, res, next) => {
  */
 const schemas = {
   order: [
-    body('userId').notEmpty().trim().escape().withMessage('User ID is required'),
+    body('userId').notEmpty().withMessage('User ID is required'),
     body('items').isArray({ min: 1 }).withMessage('Items must be a non-empty array'),
-    body('items.*.id').notEmpty().trim().escape().withMessage('Item ID is required'),
+    body('items.*.id').notEmpty().withMessage('Item ID is required'),
     body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
     body('total').isFloat({ min: 0 }).withMessage('Total must be a positive number'),
     body('deliveryInfo').isObject().withMessage('Delivery info is required'),

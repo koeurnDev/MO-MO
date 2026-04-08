@@ -30,6 +30,11 @@ export const useApi = (customConfig = {}) => {
         }
         
         if (!response.ok) {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || errorData.message || `HTTP Error: ${response.status}`);
+          }
           throw new Error(`HTTP Error: ${response.status}`);
         }
         
