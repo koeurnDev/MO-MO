@@ -84,6 +84,8 @@ const AdminDashboard = ({
   const [promoText, setPromoText] = useState('');
   const [promoBannerUrl, setPromoBannerUrl] = useState('');
   const [shopLogoUrl, setShopLogoUrl] = useState('');
+  const [paymentQrUrl, setPaymentQrUrl] = useState('');
+  const [paymentInfo, setPaymentInfo] = useState('');
 
   useEffect(() => {
     if (settingsData?.success) {
@@ -94,6 +96,8 @@ const AdminDashboard = ({
       setPromoText(s.promo_text || '');
       setPromoBannerUrl(s.promo_banner_url || '');
       setShopLogoUrl(s.shop_logo_url || '');
+      setPaymentQrUrl(s.payment_qr_url || '');
+      setPaymentInfo(s.payment_info || '');
     }
   }, [settingsData]);
 
@@ -291,6 +295,8 @@ const AdminDashboard = ({
         if (key === 'delivery_fee') setGlobalDeliveryFee(value);
         if (key === 'delivery_threshold') setGlobalDeliveryThreshold(value);
         if (key === 'shop_logo_url') setGlobalShopLogoUrl(value);
+        if (key === 'payment_qr_url') setPaymentQrUrl(value);
+        if (key === 'payment_info') setPaymentInfo(value);
       }
     });
   };
@@ -319,6 +325,17 @@ const AdminDashboard = ({
         await updateSettingValue('shop_logo_url', data.url);
         setShopLogoUrl(data.url);
         setGlobalShopLogoUrl(data.url);
+      }
+    } finally { }
+  };
+  const handleQrUpload = async (file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const res = await fetchWithRetry(`${BACKEND_URL}/api/admin/upload`, { method: 'POST', headers, body: formData });
+      if (res.success) {
+        await updateSettingValue('payment_qr_url', res.url);
+        setPaymentQrUrl(res.url);
       }
     } finally { }
   };
@@ -806,6 +823,49 @@ const AdminDashboard = ({
                           }} />
                        </label>
                     </div>
+                     </div>
+                  </div>
+
+                  <div className="glass-card-luxury">
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                        <div style={{ fontSize: 24 }}>💳</div>
+                        <div style={{ flex: 1 }}>
+                           <div style={{ fontWeight: 950, fontSize: 16 }}>ព័ត៌មានបង់ប្រាក់ (Payment Info)</div>
+                           <div style={{ fontSize: 12, opacity: 0.6 }}>កំណត់រូប QR និងលេខគណនីធនាគារ</div>
+                        </div>
+                     </div>
+                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 15 }}>
+                        <div>
+                           <label style={{ display: 'block', fontSize: 11, fontWeight: 900, marginBottom: 8, opacity: 0.7 }}>រូបភាព QR (KHQR)</label>
+                           <label className="upload-zone-luxury" style={{ height: 120 }}>
+                              {paymentQrUrl ? (
+                                <img src={paymentQrUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" crossOrigin="anonymous" />
+                              ) : (
+                                <div className="upload-label-content">
+                                   <div style={{ fontSize: 22 }}>📸</div>
+                                   <div style={{ fontSize: 10, fontWeight: 900 }}>ដាក់រូប QR</div>
+                                </div>
+                              )}
+                              <input type="file" accept="image/*" onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleQrUpload(file);
+                              }} />
+                           </label>
+                        </div>
+                        <div>
+                           <label style={{ display: 'block', fontSize: 11, fontWeight: 900, marginBottom: 8, opacity: 0.7 }}>ព័ត៌មានគណនី</label>
+                           <textarea 
+                             className="input-glass-admin" 
+                             style={{ height: 120, fontSize: 12 }} 
+                             placeholder="ឧទាហរណ៍៖ ABA: 000 111 222 (NAME)" 
+                             value={paymentInfo} 
+                             onChange={e => setPaymentInfo(e.target.value)} 
+                           />
+                        </div>
+                     </div>
+                     <button className="ticket-btn-primary" onClick={() => updateSettingValue('payment_info', paymentInfo)}>
+                       💾 រក្សាទុកព័ត៌មានបង់ប្រាក់
+                     </button>
                   </div>
                </div>
             </div>

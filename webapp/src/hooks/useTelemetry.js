@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useTelegram } from '../context/TelegramContext';
 
-const TELEMETRY_URL = `${import.meta.env.VITE_BACKEND_URL}/api/telemetry`;
+const TELEMETRY_URL = `${import.meta.env.VITE_BACKEND_URL}/api/events`;
 
 export const useTelemetry = () => {
   const { tg } = useTelegram();
