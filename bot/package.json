@@ -23,6 +23,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "setup:bot": "node scripts/setup-bot.js"
   }
 }

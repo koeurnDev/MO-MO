@@ -40,7 +40,8 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
   
   if (!localOrder) return null;
   
-  const displayId = localOrder.order_code || localOrder.id;
+  const isDraft = localOrder.id === 'DRAFT';
+  const displayId = isDraft ? '...' : (localOrder.order_code || localOrder.id);
   const dbId = localOrder.id;
   const items = typeof localOrder.items === 'string' ? JSON.parse(localOrder.items) : localOrder.items;
 
@@ -117,9 +118,9 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
           </div>
           <div style={{ textAlign: 'right' }}>
              <div className="order-id-lux">{t('order_date')}</div>
-             <div style={{ fontWeight: 950, fontSize: 13 }}>
-                {new Date(order.created_at).toLocaleDateString(lang === 'kh' ? 'km-KH' : 'en-US')}
-             </div>
+              <div style={{ fontWeight: 950, fontSize: 13 }}>
+                {!isDraft && new Date(localOrder.created_at).toLocaleDateString(lang === 'kh' ? 'km-KH' : 'en-US')}
+              </div>
           </div>
        </div>
 
@@ -138,8 +139,8 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
 
        <div className="receipt-total-row">
           <span style={{ fontSize: 18, fontWeight: 950, color: 'var(--text-bold)' }}>{t('final_total')}</span>
-          <span className="mega-price-primary" style={{ fontSize: 32 }}>${parseFloat(order.total).toFixed(2)}</span>
-       </div>
+          <span className="mega-price-primary" style={{ fontSize: 32 }}>${parseFloat(localOrder.total).toFixed(2)}</span>
+        </div>
 
        {/* Verification QR */}
        <div style={{ textAlign: 'center', marginTop: 48, padding: '24px', background: 'var(--bg-soft)', borderRadius: '28px' }}>

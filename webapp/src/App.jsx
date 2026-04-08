@@ -150,13 +150,28 @@ function App() {
     }
 
     setIsPlacingOrder(true);
+    
+    // 🚀 Optimistic UI: Show the modal immediately with a "Draft" order 
+    // This removes the perceived lag while waiting for the server.
+    const draftOrder = {
+      id: 'DRAFT',
+      order_code: '...',
+      total: finalTotal,
+      items: cart,
+      created_at: new Date().toISOString(),
+      status: 'pending'
+    };
+    setLastOrder(draftOrder);
+    setShowInvoice(true);
+
     const result = await fetchWithRetry(`${BACKEND_URL}/api/orders`, requestOptions);
     setIsPlacingOrder(false);
     
     if (result.success) {
       setLastOrder(result.data.order);
-      setShowInvoice(true);
+      // Modal will automatically update via setLastOrder
     } else {
+      setShowInvoice(false); // Rollback on error
       showAlert(result.error || 'Order Failed');
     }
   };
