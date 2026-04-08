@@ -63,22 +63,30 @@ app.use(express.json());
 app.use(observabilityLogger);
 app.use(cors({
   origin: (origin, callback) => {
-    // 🛡️ Strict CORS: localhost only for dev, WEBAPP_URL for production
     const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
-    const allowed = [process.env.WEBAPP_URL];
+    
+    // 🛡️ Normalized Allowed List
+    const rawWebappUrl = process.env.WEBAPP_URL || '';
+    const cleanWebappUrl = rawWebappUrl.replace(/\/$/, ''); // Remove trailing slash
+    
+    const allowed = [cleanWebappUrl];
     if (isDev) {
       allowed.push('http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000');
     }
     
-    if (!origin || allowed.filter(Boolean).includes(origin)) {
+    // Allow same-origin (null origin) and allowed list
+    const isAllowed = !origin || allowed.filter(Boolean).some(url => origin === url || origin === `${url}/`);
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn(`⚠️ CORS blocked origin: ${origin}`);
+      console.warn(`🔴 CORS Blocked: Origin "${origin}" is not in the allowed list:`, allowed.filter(Boolean));
       callback(null, false);
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'X-TG-Data', 'Authorization']
+  allowedHeaders: ['Content-Type', 'X-TG-Data', 'x-tg-data', 'Authorization'],
+  credentials: true
 }));
 
 // --- Routes ---
