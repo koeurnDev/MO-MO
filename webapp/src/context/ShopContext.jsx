@@ -59,6 +59,19 @@ export const ShopProvider = ({ children }) => {
     return () => window.removeEventListener('online', handleSync);
   }, [fetchWithRetry]);
 
+  // 🚀 Real-time Sync: Background polling for products/settings
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // 🛡️ Only sync if tab is visible to save battery/bandwidth
+      if (document.visibilityState === 'visible') {
+        refetchProducts(true); // silent refresh
+        refetchSettings(true); // silent refresh
+      }
+    }, 30000); // 30s sync window
+    
+    return () => clearInterval(interval);
+  }, [refetchProducts, refetchSettings]);
+
   // Sync settings state with query result
   useEffect(() => {
     if (settingsData?.settings) {
