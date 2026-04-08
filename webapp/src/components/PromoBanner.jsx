@@ -1,20 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-const PromoBanner = ({ threshold, promoText }) => {
-  const handleClick = () => {
-    const tg = window.Telegram?.WebApp;
-    if (tg?.isVersionAtLeast && tg.isVersionAtLeast('6.1')) {
-      tg.HapticFeedback.impactOccurred('light');
-    }
-  };
+const PromoBanner = ({ threshold, promoText, promoBannerUrl, t, lang }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  if (promoBannerUrl) {
+    return (
+      <div className="ads-hero-container">
+        <div className={`ads-hero-wrapper animate-in ${isLoaded ? 'loaded' : 'loading'}`}>
+           {!isLoaded && <div className="ads-hero-skeleton"></div>}
+           <img 
+              src={promoBannerUrl.replace('upload/', 'upload/f_auto,q_auto,w_1000/')} 
+              alt="Boutique Poster" 
+              className={`ads-hero-img ${isLoaded ? 'visible' : 'hidden'}`}
+              onLoad={() => setIsLoaded(true)}
+              crossOrigin="anonymous"
+           />
+           <div className="ads-hero-glass-edge"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="promo-banner-container animate-in">
-      <div className="promo-banner-luxury" onClick={handleClick}>
-        <span className="promo-tag">New</span>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>
-          {promoText || "🚚 ដឹកជញ្ជូនឥតគិតថ្លៃលើរាល់ការកម្ម៉ង់! • $50+"}
-        </span>
+    <div className="promo-banner-container">
+      <div className="promo-banner-luxury animate-in">
+        <div className="promo-pill">
+          <span className="promo-icon">🚚</span>
+          <span className="promo-text">
+            {promoText || (lang === 'en' ? `Free Delivery on orders over $${threshold}` : `ដឹកជញ្ជូនឥតគិតថ្លៃរាល់ការកុម្មង់ចាប់ពី $${threshold} ឡើងទៅ`)}
+          </span>
+        </div>
       </div>
     </div>
   );

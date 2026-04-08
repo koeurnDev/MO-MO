@@ -22,6 +22,21 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      - key: DB_POOL_MAX
+        value: "50"
+      - key: DB_POOL_MIN
+        value: "10"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: redis
+          property: connectionString
+
+  # 3. Redis (Job Queue & Cache)
+  - type: redis
+    name: redis
+    plan: starter
+    ipAllowList: [] # Required for internal access
 
   # 2. Frontend (Mini App WebApp)
   - type: web

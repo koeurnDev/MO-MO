@@ -14,7 +14,8 @@ const TAG_LENGTH = 16;
 function encrypt(text) {
   if (!text) return text;
   
-  const pepper = process.env.SECURITY_PEPPER || 'mo_mo_default_pepper_key_32_chars_123';
+  const pepper = process.env.SECURITY_PEPPER;
+  if (!pepper) throw new Error('🛑 SECURITY_PEPPER is MISSING. Encryption aborted.');
   const iv = crypto.randomBytes(IV_LENGTH);
   const salt = crypto.randomBytes(SALT_LENGTH);
   
@@ -40,7 +41,8 @@ function decrypt(cipherText) {
   if (!cipherText || !cipherText.includes(':')) return cipherText;
   
   try {
-    const pepper = process.env.SECURITY_PEPPER || 'mo_mo_default_pepper_key_32_chars_123';
+    const pepper = process.env.SECURITY_PEPPER;
+    if (!pepper) throw new Error('🛑 SECURITY_PEPPER is MISSING. Decryption aborted.');
     const [ivHex, tagHex, saltHex, encryptedHex] = cipherText.split(':');
     
     const iv = Buffer.from(ivHex, 'hex');

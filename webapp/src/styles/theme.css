@@ -1,0 +1,37 @@
+:root {
+  /* 🎨 Primary Brand Colors */
+  --primary-accent: #ff72a0;
+  --primary-gradient: linear-gradient(135deg, #ff72a0 0%, #ec4899 100%);
+
+  /* 🌗 Theme Tokens (Light Mode - Default) */
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-input: #f1f5f9;
+  --text-main: #1e293b;
+  --text-bold: #0f172a;
+  --text-muted: #64748b;
+  --border-subtle: rgba(226, 232, 240, 0.6);
+  --bg-soft: #f1f5f9;
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --profile-banner-bg: linear-gradient(135deg, #ff9eb5 0%, #ff72a0 100%);
+
+  /* 📐 Layout Tokens */
+  --card-radius: 28px;
+  --inner-radius: 22px;
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 10px 40px rgba(0, 0, 0, 0.08);
+  --font-khmer: 'Kantumruy Pro', sans-serif;
+}
+
+[data-theme='dark'] {
+  --bg-app: #020617;
+  --bg-surface: #0f172a;
+  --bg-input: #1e293b;
+  --text-main: #f8fafc;
+  --text-bold: #ffffff;
+  --text-muted: #94a3b8;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --bg-soft: rgba(255, 255, 255, 0.05);
+  --glass-bg: rgba(15, 23, 42, 0.85);
+  --profile-banner-bg: linear-gradient(135deg, #0f172a 0%, rgba(255, 114, 160, 0.25) 100%);
+}

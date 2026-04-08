@@ -1,6 +1,6 @@
 import React from 'react';
 
-const CartItem = ({ item, updateQty }) => {
+const CartItem = ({ item, updateQty, t, lang }) => {
   // Optimized image URL helper
   const getOptimizedImg = (url, width) => {
     if (!url) return '';
@@ -22,16 +22,24 @@ const CartItem = ({ item, updateQty }) => {
       
       <div className="slot-details">
         <div className="slot-name">{item.name}</div>
-        <div className="slot-price">${item.price.toFixed(2)}</div>
+        <div className="qty-pill-container">
+          <button className="qty-action" onClick={() => updateQty(item.id, -1)} aria-label={lang === 'kh' ? 'បន្ថយចំនួន' : 'Decrease Quantity'}>
+            −
+          </button>
+          <div className="qty-number">{item.quantity}</div>
+          <button className="qty-action" onClick={() => updateQty(item.id, 1)} aria-label={lang === 'kh' ? 'បង្កើនចំនួន' : 'Increase Quantity'}>
+            +
+          </button>
+        </div>
       </div>
 
-      <div className="qty-pill-container">
-        <button className="qty-action" onClick={() => updateQty(item.id, -1)}>
-           <svg width="12" height="2" viewBox="0 0 12 2" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="0" y1="1" x2="12" y2="1" /></svg>
-        </button>
-        <div className="qty-number">{item.quantity}</div>
-        <button className="qty-action" onClick={() => updateQty(item.id, 1)}>
-           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      <div className="slot-right-box">
+        <div className="slot-price">${item.price.toFixed(2)}</div>
+        <button 
+          className="remove-btn-minimal" 
+          onClick={() => updateQty(item.id, -item.quantity)}
+        >
+          {t('remove')}
         </button>
       </div>
     </div>

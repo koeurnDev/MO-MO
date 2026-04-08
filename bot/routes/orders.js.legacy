@@ -1,0 +1,452 @@
+const express = require('express');
+const router = express.Router();
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const { KHQR, TAG, CURRENCY, COUNTRY } = require('ts-khqr');
+const { pool, createOrder, deductStock, getSetting, upsertUser, addLoyaltyPoints, getProducts, getActiveAutoDiscounts, logPaymentActivity, submitReview } = require('../db');
+const { verifyUser } = require('../middleware/auth');
+const { calculateBestDiscount, getDiscountedPrice } = require('../utils/discountUtils');
+const { sanitize, sanitizeObject } = require('../utils/sanitizer');
+
+const Queue = require('bull');
+
+let bot;
+router.setBot = (b) => { bot = b; };
+
+// ✅ Initialize notification queue (Redis connection)
+const notificationQueue = new Queue('notifications', {
+  redis: { 
+    host: process.env.REDIS_HOST || 'localhost', 
+    port: process.env.REDIS_PORT || 6379 
+  }
+});
+
+// ✅ Queue processor: Handle Telegram notifications in the background
+notificationQueue.process(async (job) => {
+  const { type, adminId, userId, order, items } = job.data;
+  try {
+    if (bot) {
+      const itemsList = items.map(it => `- ${it.name} x ${it.quantity}`).join('\n');
+      
+      if (type === 'order_created') {
+        const ticket = `🛒 *ការកម្ម៉ង់ថ្មី (New Order)*\n` +
+                      `🆔 លេខសម្គាល់: \`${order.order_code}\`\n` +
+                      `👤 អតិថិជន: *${order.user_name}*\n` +
+                      `📝 ទំនិញ:\n${itemsList}\n\n` +
+                      `💰 សរុប: *$${order.total}*`;
+        await bot.telegram.sendMessage(adminId, ticket, { parse_mode: 'Markdown' });
+        
+        const userTicket = `🛒 *ការកម្ម៉ង់របស់អ្នកត្រូវបានទទួល!*\n` +
+                          `🆔 លេខសម្គាល់: \`${order.order_code}\`\n` +
+                          `💰 សរុប: *$${order.total}*`;
+        await bot.telegram.sendMessage(userId, userTicket, { parse_mode: 'Markdown' });
+      } else if (type === 'order_paid') {
+        const ticket = `🎫 *វិក្កយបត្រកម្មង់ដែលបានបង់ប្រាក់*\n` +
+                       `🆔 លេខសម្គាល់: \`${order.order_code}\`\n` +
+                       `👤 អតិថិជន: *${order.user_name}*\n` +
+                       `📦 ទំនិញ:\n${itemsList}\n` +
+                       `💰 សរុប: *$${order.total}*`;
+        await bot.telegram.sendMessage(adminId, ticket, { parse_mode: 'Markdown' });
+
+        const userTicket = `✨ *វិក្កយបត្រកម្មង់ដែលបានបង់ប្រាក់*\n` +
+                          `🆔 លេខសម្គាល់: \`${order.order_code}\`\n` +
+                          `✅ ការបង់ប្រាក់ត្រូវបានបញ្ជាក់ជោគជ័យ! អរគុណសម្រាប់ការគាំទ្រពី MO MO Boutique។`;
+        await bot.telegram.sendMessage(userId, userTicket, { parse_mode: 'Markdown' });
+      }
+    }
+  } catch (e) {
+    console.error('Notification fail:', e.message);
+    throw e;
+  }
+});
+
+/**
+ * ✅ Parallelize order context fetching (Senior Performance Fix)
+ */
+const getOrderContext = async (client, itemIds) => {
+  // Fetch products, active discounts, and relevant settings in parallel
+  const [productsRes, discountsRes, settingsRes] = await Promise.all([
+    client.query('SELECT * FROM products WHERE id = ANY($1)', [itemIds]),
+    client.query(`
+      SELECT c.*, array_agg(cp.product_id) FILTER (WHERE cp.product_id IS NOT NULL) as product_ids
+      FROM coupons c
+      LEFT JOIN coupon_products cp ON c.id = cp.coupon_id
+      WHERE c.is_auto = true AND c.active = true 
+      AND (c.start_date IS NULL OR c.start_date <= CURRENT_TIMESTAMP)
+      AND (c.end_date IS NULL OR c.end_date >= CURRENT_TIMESTAMP)
+      GROUP BY c.id
+    `),
+    client.query("SELECT key, value FROM settings WHERE key IN ('delivery_threshold', 'delivery_fee')")
+  ]);
+
+  return {
+    products: productsRes.rows,
+    discounts: discountsRes.rows,
+    settings: settingsRes.rows
+  };
+};
+
+const logError = (msg) => {
+  let finalMsg = msg;
+  if (typeof msg === 'object' && msg !== null) {
+    // Redact sensitive info from objects before logging
+    const redacted = { ...msg };
+    const fieldsToRedact = ['qr_string', 'phone', 'address', 'userId', 'user_id'];
+    fieldsToRedact.forEach(f => { if (redacted[f]) redacted[f] = '[REDACTED]'; });
+    finalMsg = JSON.stringify(redacted);
+  }
+  const logMsg = `[${new Date().toISOString()}] ${finalMsg}\n`;
+  fs.appendFileSync(path.join(__dirname, '../../error_log.txt'), logMsg);
+};
+
+// 🛡 Senior 20-Year Exp: Secure 32-char Random ID
+const generateSecureID = () => crypto.randomBytes(16).toString('hex').toUpperCase();
+
+const md5 = (text) => {
+  if (!text) return '';
+  return crypto.createHash('md5').update(String(text)).digest('hex');
+};
+
+/**
+ * 📊 Debug Status Check
+ */
+router.get('/status/:orderCode', verifyUser, async (req, res) => {
+  try {
+    const { orderCode } = req.params;
+    const result = await pool.query('SELECT * FROM orders WHERE order_code = $1', [orderCode]);
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    let order = result.rows[0];
+    
+    // 🛡 Security Check: Only allow viewing own order status
+    if (String(req.tgUser.id) !== String(order.user_id)) {
+      return res.status(403).json({ success: false, message: 'Access Denied' });
+    }
+    const qrMd5 = order.qr_string ? md5(order.qr_string) : null;
+
+    if (order.status === 'pending' && order.qr_string) {
+      const settingsResult = await pool.query('SELECT key, value FROM settings WHERE key IN ($1, $2, $3, $4)', 
+        ['bakong_api_url', 'bakong_api_token', 'bakong_auto_confirm', 'bakong_account_id']);
+      const settings = Object.fromEntries(settingsResult.rows.map(r => [r.key, r.value]));
+
+      const apiUrl = process.env.BAKONG_API_URL || settings.bakong_api_url;
+      const apiToken = process.env.BAKONG_API_TOKEN || settings.bakong_api_token;
+
+      if (apiUrl && apiToken) {
+        try {
+          const checkMd5 = md5(order.qr_string);
+          const checkUrl = apiUrl.endsWith('/') ? `${apiUrl}v1/check_transaction_by_md5` : `${apiUrl}/v1/check_transaction_by_md5`;
+          
+          // Log request details
+          logError(`[TRACE] Checking order #${id} | MD5: ${checkMd5} | URL: ${checkUrl}`);
+
+          // 🛡 Senior 20-Year Exp: Fetch Timeout (10s)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+          const response = await fetch(checkUrl, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${apiToken}`
+            },
+            body: JSON.stringify({ md5: checkMd5 })
+          });
+          clearTimeout(timeoutId);
+
+          const data = await response.json();
+          // 🛡 Senior 20-Year Exp Fix: Audit Logging
+          await logPaymentActivity(id, data.responseCode === 0 ? 'success' : 'failed', order.total, JSON.stringify(data))
+            .catch(e => logError(`Audit Log Fail: ${e.message}`));
+            
+          logError(`[TRACE] Bakong Answer for #${id}: ${JSON.stringify(data)}`);
+
+          // ✅ ATOMIC UPDATE: Ensure we only notify once if status was 'pending'
+          if (data && (data.responseCode === 0 || data.responseCode === "0")) {
+             const updateRes = await pool.query(
+               "UPDATE orders SET status = 'paid' WHERE id = $1 AND status = 'pending' RETURNING *", 
+               [id]
+             );
+             
+             if (updateRes.rows.length > 0) {
+                const updatedOrder = updateRes.rows[0];
+                order = updatedOrder; // Sync for response
+
+                 // ✅ Async Queue Notification instead of blocking
+                 if (bot && process.env.SUPERADMIN_ID) {
+                   const items = JSON.parse(updatedOrder.items || '[]');
+                   notificationQueue.add({
+                     type: 'order_paid',
+                     adminId: process.env.SUPERADMIN_ID,
+                     userId: updatedOrder.user_id,
+                     order: updatedOrder,
+                     items: items
+                   }, { attempts: 3, backoff: { type: 'exponential', delay: 2000 } })
+                   .catch(e => logError(`Paid Queue Fail: ${e.message}`));
+                 }
+             }
+          }
+        } catch (apiError) { 
+          logError(`[TRACE] Bakong API Crash: ${apiError.message}`); 
+        }
+      }
+    }
+    res.json({ success: true, status: order.status, md5: qrMd5 });
+  } catch (error) { 
+    logError(`Status check fail: ${error.message}`);
+    res.status(500).json({ success: false, message: 'Server error' }); 
+  }
+});
+
+// 🛡 Senior 20-Year Exp: Order Creation Rate Limiter
+const orderCreationLimit = new Map();
+const orderRateLimiter = (req, res, next) => {
+  const ip = req.ip || req.socket.remoteAddress;
+  const now = Date.now();
+  const limit = 10; // Increased to 10 orders per 10 minutes for dev comfort
+  const windowMs = 10 * 60 * 1000;
+  if (!orderCreationLimit.has(ip)) { orderCreationLimit.set(ip, [now]); return next(); }
+  const timestamps = orderCreationLimit.get(ip).filter(t => now - t < windowMs);
+  if (timestamps.length >= limit) return res.status(429).json({ success: false, error: 'Too many orders. Please wait.' });
+  timestamps.push(now);
+  orderCreationLimit.set(ip, timestamps);
+  next();
+};
+
+router.post('/', orderRateLimiter, verifyUser, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { userId, userName, items, total, deliveryInfo, idempotencyKey } = req.body;
+    
+    // 🛡 Security Check: Only allow ordering for self
+    if (String(req.tgUser.id) !== String(userId)) {
+      return res.status(403).json({ success: false, error: 'Identity Mismatch' });
+    }
+    if (!items || items.length === 0 || total === undefined) {
+      logError(`POST /api/orders 400: Missing details | Items: ${JSON.stringify(items)} | Total: ${total}`);
+      return res.status(400).json({ success: false, error: 'Missing details' });
+    }
+
+    const shopStatus = await getSetting('shop_status');
+    if (shopStatus === 'closed') return res.status(403).json({ success: false, error: 'Shop closed' });
+
+    // 🚀 BEGIN TRANSACTION (Senior 10-Year Exp Fix)
+    await client.query('BEGIN');
+
+    // 🛡 Senior 20-Year Exp: Robust Idempotency Check (Prevent Duplicate Charges)
+    if (idempotencyKey) {
+      const existingRes = await client.query(
+        'SELECT id, order_code, qr_string, status FROM orders WHERE user_id = $1 AND idempotency_key = $2',
+        [userId, idempotencyKey]
+      );
+      if (existingRes.rows.length > 0) {
+        await client.query('ROLLBACK');
+        console.log(`🛡 [Idempotency] Existing order returned for key ${idempotencyKey}`);
+        return res.json({ success: true, order: existingRes.rows[0], message: 'Existing order found' });
+      }
+    }
+
+    // 🛡 Senior 20-Year Exp: Legacy Idempotency Check (Prevent Duplicate Clicks)
+    const itemsJson = JSON.stringify(items);
+    const recentRes = await client.query(
+      `SELECT id, order_code FROM orders 
+       WHERE user_id = $1 AND total = $2 AND items = $3 AND created_at > NOW() - INTERVAL '30 seconds' 
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId, total, itemsJson]
+    );
+
+    if (recentRes.rows.length > 0) {
+      await client.query('ROLLBACK');
+      console.log(`🛡 [Idempotency] Duplicate blocked for User ${userId}`);
+      return res.json({ success: true, order: recentRes.rows[0], message: 'Existing order found' });
+    }
+
+    // 🛡 PARALLEL Context Fetch (Senior Performance Fix)
+    const itemIds = items.map(i => i.id);
+    const context = await getOrderContext(client, itemIds);
+    const { products: dbProducts, discounts: activeDiscounts, settings: dbSettings } = context;
+
+    const threshold = dbSettings.find(s => s.key === 'delivery_threshold')?.value || '50';
+    const fee = dbSettings.find(s => s.key === 'delivery_fee')?.value || '1.50';
+
+    let calculatedSubtotal = 0;
+    for (const cartItem of items) {
+      const realProduct = dbProducts.find(p => p.id === cartItem.id);
+      if (!realProduct) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, error: 'ទំនិញមិនត្រឹមត្រូវ' });
+      }
+      const best = calculateBestDiscount(realProduct, activeDiscounts);
+      calculatedSubtotal += getDiscountedPrice(realProduct, best) * cartItem.quantity;
+    }
+
+    const deliveryFee = calculatedSubtotal >= parseFloat(threshold) ? 0 : parseFloat(fee);
+    const calculatedTotal = parseFloat((calculatedSubtotal + deliveryFee).toFixed(2));
+
+    if (Math.abs(calculatedTotal - parseFloat(total)) > 0.01) {
+      await client.query('ROLLBACK');
+      logError({ event: 'Price Error', calc: calculatedTotal, sent: total, userId });
+      return res.status(400).json({ success: false, error: `បញ្ហាតម្លៃ (Price Error): Calc $${calculatedTotal} vs Sent $${total}` });
+    }
+
+    for (const item of items) {
+      if (!item.id || !item.quantity) continue;
+      const res = await client.query(
+        'UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1 RETURNING *', 
+        [item.quantity, item.id]
+      );
+      if (!res.rows[0]) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, error: `${item.name} អស់ស្តុកហើយ` });
+      }
+
+      // 🛡 Senior UX: Low Stock Alert for Admin
+      const updatedProduct = res.rows[0];
+      if (updatedProduct.stock <= 5 && bot && process.env.SUPERADMIN_ID) {
+        bot.telegram.sendMessage(process.env.SUPERADMIN_ID, 
+          `⚠️ *LOW STOCK ALERT*\n\n` +
+          `📦 ទំនិញ: *${updatedProduct.name}*\n` +
+          `📉 ចំនួននៅសល់: *${updatedProduct.stock}* គ្រឿង\n\n` +
+          `សូមប្រញាប់បន្ថែមស្តុកបាទ!`, 
+          { parse_mode: 'Markdown' }
+        ).catch(e => console.error('Low Stock Alert Fail:', e.message));
+      }
+    }
+
+
+    const { 
+      phone = '', 
+      address = '', 
+      province = '', 
+      note = '', 
+      deliveryCompany = 'j&t', 
+      paymentMethod = 'Bakong KHQR' 
+    } = deliveryInfo || {};
+
+    const sanitizedPhone = sanitize(phone || '').substring(0, 20);
+    const sanitizedAddress = sanitize(address || '').substring(0, 500);
+    const sanitizedProvince = sanitize(province || '').substring(0, 50);
+    const sanitizedNote = sanitize(note || '').substring(0, 500);
+
+    const orderCode = 'MO-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const order = (await client.query(
+      `INSERT INTO orders 
+       (user_id, user_name, items, total, qr_string, phone, address, province, note, delivery_company, payment_method, order_code, idempotency_key) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+      [
+        userId || null, 
+        userName || 'Guest', 
+        JSON.stringify(items), 
+        calculatedTotal, 
+        '', 
+        sanitizedPhone, 
+        sanitizedAddress, 
+        sanitizedProvince, 
+        sanitizedNote, 
+        deliveryCompany, 
+        paymentMethod,
+        orderCode,
+        idempotencyKey || null
+      ]
+    )).rows[0];
+
+    await client.query('COMMIT');
+
+    // --- Post-Commit Logic (QR, Notifications) ---
+    try {
+      const bakongId = process.env.MERCHANT_BAKONG_ID || (await pool.query("SELECT value FROM settings WHERE key = 'bakong_account_id'")).rows[0]?.value;
+      const merchantName = process.env.BAKONG_MERCHANT_NAME || (await pool.query("SELECT value FROM settings WHERE key = 'bakong_merchant_name'")).rows[0]?.value;
+      
+      const qrResult = KHQR.generate({
+        tag: TAG.INDIVIDUAL,
+        accountID: bakongId,
+        merchantName: merchantName,
+        merchantCity: 'Phnom Penh',
+        amount: String(calculatedTotal.toFixed(2)),
+        currency: CURRENCY.USD,
+        countryCode: COUNTRY.KH,
+        expirationTimestamp: Date.now() + 5 * 60 * 1000, 
+        additionalData: { billNumber: order.order_code }
+      });
+
+      if (qrResult && qrResult.data && qrResult.status.code === 0) {
+         await pool.query('UPDATE orders SET qr_string = $1 WHERE id = $2', [qrResult.data.qr, order.id]);
+         order.qr_string = qrResult.data.qr;
+      }
+    } catch (qrErr) { logError(`QR Fail: ${qrErr.message}`); }
+
+    if (userId && deliveryInfo) {
+      const phone = String(deliveryInfo.phone || '').trim().substring(0, 20);
+      const address = String(deliveryInfo.address || '').trim().substring(0, 500);
+      await upsertUser(userId, phone, address).catch(e => logError(e.message));
+      await addLoyaltyPoints(userId, Math.floor(calculatedTotal)).catch(e => logError(e.message));
+    }
+    
+    // ✅ Async Queue Notification for new order
+    if (bot && process.env.SUPERADMIN_ID) {
+      notificationQueue.add({
+        type: 'order_created',
+        adminId: process.env.SUPERADMIN_ID,
+        userId: userId,
+        order: order,
+        items: items
+      }, { attempts: 3, backoff: { type: 'exponential', delay: 2000 } })
+      .catch(e => logError(`Created Queue Fail: ${e.message}`));
+    }
+    
+    res.json({ success: true, order: order });
+  } catch (err) { 
+    await client.query('ROLLBACK');
+    logError(`POST /api/orders FAIL: ${err.message}`);
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' }); 
+  } finally {
+    client.release();
+  }
+});
+
+router.get('/user/:userId', verifyUser, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // 🛡 Security Check: Only allow viewing own history
+    if (String(req.tgUser.id) !== String(userId)) {
+      return res.status(403).json({ success: false, message: 'Access Denied' });
+    }
+
+    const result = await pool.query('SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    res.json({ success: true, orders: result.rows });
+  } catch (error) {
+    logError(`Get history fail: ${error.message}`);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.post('/review', verifyUser, async (req, res) => {
+  try {
+    const { productId, rating, comment, userName } = req.body;
+    const userId = String(req.tgUser.id);
+
+    if (!productId || !rating ) {
+      return res.status(400).json({ success: false, error: 'Missing rating details' });
+    }
+
+    const review = await submitReview({
+      productId,
+      userId,
+      userName: userName || req.tgUser.first_name || 'MO MO Lover',
+      rating: parseInt(rating),
+      comment: comment || ''
+    });
+
+    res.json({ success: true, review });
+  } catch (error) {
+    logError(`Review submit fail: ${error.message}`);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+module.exports = router;

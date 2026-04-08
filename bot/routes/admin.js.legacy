@@ -1,0 +1,368 @@
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const { isAdmin } = require('../middleware/auth');
+const upload = multer({ storage: multer.memoryStorage() });
+
+const { 
+  pool, getCategories, addCategory, deleteCategory, addLoyaltyPoints, logAdminAction,
+  getAllSettings, getDashboardSummary, clearInitialDataCache, getAllUserIds,
+  getAnalytics, getCustomers, getCoupons, addCoupon, deleteCoupon, getSetting,
+  updateSetting, getProducts, addProduct, updateProduct, deleteProduct, getOrders
+} = require('../db');
+const { sanitize, sanitizeObject } = require('../utils/sanitizer');
+
+// --- Helper to get bot for notifications ---
+let bot;
+router.setBot = (b) => { bot = b; };
+
+/**
+ * 🛡 Senior 10-Year Exp Case: Output Sanitization (XSS Defense)
+ */
+const sanitizeUser = (u) => ({
+  ...u,
+  user_name: sanitize(u.user_name || ''),
+  phone: sanitize(u.phone || ''),
+  address: sanitize(u.address || '')
+});
+
+/**
+ * 🛡 Legendary 50-Year Exp Case: Admin Activity Notifications
+ */
+const notifyAdmin = (msg) => {
+  if (bot && process.env.SUPERADMIN_ID) {
+    bot.telegram.sendMessage(process.env.SUPERADMIN_ID, `🔔 *ADMIN ALERT*: ${msg}`, { parse_mode: 'Markdown' })
+      .catch(e => console.error('Alert Fail:', e.message));
+  }
+};
+
+// 1. Categories
+router.get('/categories', isAdmin, async (req, res) => {
+  try {
+    const cats = await getCategories();
+    res.json({ success: true, categories: cats });
+  } catch (err) { 
+    console.error('Categorires GET error:', err);
+    res.status(500).json({ success: false, error: err.message }); 
+  }
+});
+
+router.post('/categories', isAdmin, async (req, res) => {
+  try {
+    const name = sanitize(req.body.name || '');
+    const cat = await addCategory(name);
+    await logAdminAction(req.user.user_id, 'CREATE_CATEGORY', cat.id, JSON.stringify({ name }));
+    clearInitialDataCache(); // 🚀 Keep Shop Synced
+    notifyAdmin(`បានបង្កើតតារាងប្រភេទថ្មី: *${name}*`);
+    res.json({ success: true, category: cat });
+  } catch (err) { 
+    console.error('Categories POST error:', err);
+    res.status(500).json({ success: false, error: err.message }); 
+  }
+});
+
+router.delete('/categories/:id', isAdmin, async (req, res) => {
+  try {
+    await deleteCategory(req.params.id);
+    await logAdminAction(req.user.user_id, 'DELETE_CATEGORY', req.params.id, '');
+    clearInitialDataCache(); // 🚀 Keep Shop Synced
+    notifyAdmin(`បានលុបតារាងប្រភេទ ID: *${req.params.id}*`);
+    res.json({ success: true });
+  } catch (err) { 
+    console.error('Categories DELETE error:', err);
+    res.status(500).json({ success: false, error: err.message }); 
+  }
+});
+
+// 2. Analytics
+router.get('/analytics', isAdmin, async (req, res) => {
+  try {
+    const data = await getAnalytics();
+    res.json({ success: true, ...data });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.get('/customers', isAdmin, async (req, res) => {
+  try {
+    const customers = await getCustomers();
+    res.json({ success: true, customers: customers.map(sanitizeUser) });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// 3. User Points
+router.post('/users/points', isAdmin, async (req, res) => {
+  const { userId, points } = req.body;
+  try {
+    const user = await addLoyaltyPoints(userId, points);
+    await logAdminAction(req.user.user_id, 'ADD_POINTS', userId, JSON.stringify({ points }));
+    res.json({ success: true, user });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// 4. Coupons
+router.get('/coupons', isAdmin, async (req, res) => {
+  try {
+    const coupons = await getCoupons();
+    res.json({ success: true, coupons });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.post('/coupons', isAdmin, async (req, res) => {
+  try {
+    const sanitized = sanitizeObject(req.body);
+    const coupon = await addCoupon(sanitized);
+    await logAdminAction(req.user.user_id, 'CREATE_COUPON', coupon.id, JSON.stringify(sanitized));
+    clearInitialDataCache(); // 🚀 Refresh Discounts
+    res.json({ success: true, coupon: coupon });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.delete('/coupons/:id', isAdmin, async (req, res) => {
+  try {
+    await deleteCoupon(req.params.id);
+    await logAdminAction(req.user.user_id, 'DELETE_COUPON', req.params.id, '');
+    clearInitialDataCache(); // 🚀 Refresh Discounts
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.get('/settings/:key', isAdmin, async (req, res) => {
+  try {
+    const value = await getSetting(req.params.key);
+    res.json({ success: true, value });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.get('/settings/all', isAdmin, async (req, res) => {
+  try {
+    const settings = await getAllSettings();
+    res.json({ success: true, settings });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.get('/summary', isAdmin, async (req, res) => {
+  try {
+    const summary = await getDashboardSummary();
+    res.json({ success: true, ...summary });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.post('/settings', isAdmin, async (req, res) => {
+  try {
+    await updateSetting(req.body.key, req.body.value);
+    await logAdminAction(req.user.user_id, 'UPDATE_SETTING', req.body.key, req.body.value);
+    clearInitialDataCache(); // 🚀 Keep Shop Synced
+    notifyAdmin(`បានកែសម្រួលការកំណត់: *${req.body.key}*`);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// 6. Products & Upload
+router.post('/upload', isAdmin, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file' });
+    cloudinary.uploader.upload_stream({ folder: 'products' }, (error, result) => {
+      if (error) return res.status(500).json({ success: false, error: error.message });
+      res.json({ success: true, url: result.secure_url });
+    }).end(req.file.buffer);
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.post('/products', isAdmin, async (req, res) => {
+  try {
+    const sanitized = sanitizeObject(req.body);
+    const product = await addProduct(sanitized);
+    await logAdminAction(req.user.user_id, 'CREATE_PRODUCT', product.id, JSON.stringify(sanitized));
+    clearInitialDataCache(); // 🚀 Keep Shop Synced
+    notifyAdmin(`បានបន្ថែមទំនិញថ្មី: *${sanitized.name}* ($${sanitized.price})`);
+    res.json({ success: true, product });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.put('/products/:id', isAdmin, async (req, res) => {
+  try {
+    const sanitized = sanitizeObject(req.body);
+    const product = await updateProduct(req.params.id, sanitized);
+    await logAdminAction(req.user.user_id, 'UPDATE_PRODUCT', req.params.id, JSON.stringify(sanitized));
+    clearInitialDataCache(); // 🚀 Keep Shop Synced
+    notifyAdmin(`បានកែសម្រួលទំនិញ ID: *${req.params.id}* (*${sanitized.name}*)`);
+    res.json({ success: true, product });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.delete('/products/:id', isAdmin, async (req, res) => {
+  try {
+    const products = await getProducts();
+    const product = products.find(p => p.id === parseInt(req.params.id));
+    if (product && product.image && product.image.includes('cloudinary.com')) {
+      const parts = product.image.split('/');
+      const fileName = parts[parts.length - 1].split('.')[0];
+      const folder = parts[parts.length - 2];
+      await cloudinary.uploader.destroy(`${folder}/${fileName}`).catch(e => console.error(e));
+    }
+    await deleteProduct(req.params.id);
+    clearInitialDataCache(); // 🚀 Keep Shop Synced
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// 7. Orders Management
+router.get('/orders', isAdmin, async (req, res) => {
+  try {
+    const orders = await getOrders();
+    const sanitized = orders.map(o => ({
+      ...o,
+      user_name: sanitize(o.user_name)
+    }));
+    res.json({ success: true, orders: sanitized });
+  } catch (err) { res.status(500).json({ success: false }); }
+});
+
+router.post('/orders/status', isAdmin, async (req, res) => {
+  try {
+    const { orderId, status, trackingNumber } = req.body;
+    
+    // 🛡 Senior Atomic Guard: Only process if not already paid (if setting to paid)
+    const query = status === 'paid' 
+      ? "UPDATE orders SET status = $1, tracking_number = $2 WHERE id = $3 AND status != 'paid' RETURNING *"
+      : "UPDATE orders SET status = $1, tracking_number = $2 WHERE id = $3 RETURNING *";
+    
+    const updateRes = await pool.query(query, [status, trackingNumber || null, orderId]);
+    if (updateRes.rows.length === 0) {
+       return res.status(400).json({ success: false, error: 'Order already updated or not found' });
+    }
+    const updated = updateRes.rows[0];
+    
+    // 🔔 Automated User Notifications
+    if (updated.user_id && bot) {
+      const displayId = updated.order_code || `#MO-${orderId}`;
+      let msg = '';
+      if (status === 'processing') msg = `📦 *ការកម្ម៉ង់ ${displayId}*: ហាង MO MO Boutique កំពុង *រៀបចំអីវ៉ាន់* របស់បងហើយ!`;
+      if (status === 'shipped') {
+        msg = `✨ *ការកម្ម៉ង់ ${displayId}*: *អីវ៉ាន់បានចេញ* ពីហាង MO MO Boutique ហើយ!`;
+        if (updated.tracking_number) msg += `\n📦 លេខតាមដាន (Tracking): \`${updated.tracking_number}\``;
+      }
+      if (status === 'delivering') {
+        msg = `🚚 *ការកម្ម៉ង់ ${displayId}*: អីវ៉ាន់បង *កំពុងដឹក* ជូនហើយ!`;
+        if (updated.tracking_number) msg += `\n📦 លេខតាមដាន (Tracking): \`${updated.tracking_number}\``;
+        msg += `\nវានឹងទៅដល់ក្នុងពេលឆាប់ៗនេះ។`;
+      }
+      if (status === 'paid') {
+        msg = `✅ *ការបង់ប្រាក់ ${displayId}*: ការបង់ប្រាក់ត្រូវបានបញ្ជាក់រួចរាល់!`;
+        
+        // 🎫 Order Ticket for Admin Records
+        if (process.env.SUPERADMIN_ID) {
+           const items = JSON.parse(updated.items || '[]');
+           const itemsList = items.map(it => `- ${it.name} x ${it.quantity}`).join('\n');
+           const ticket = `🎫 *វិក្កយបត្រកម្មង់ដែលបានបង់ប្រាក់*\n` +
+                          `🆔 លេខសម្គាល់: \`${updated.order_code || orderId}\`\n` +
+                          `👤 អតិថិជន: *${updated.user_name}*\n` +
+                          `📞 លេខទូរស័ព្ទ: \`${updated.phone || 'N/A'}\`\n` +
+                          `📍 អាសយដ្ឋាន: ${updated.address || 'N/A'} (${updated.province || ''})\n` +
+                          `📦 ទំនិញ:\n${itemsList}\n` +
+                          `💰 សរុប: *$${updated.total}*\n` +
+                          `🚚 សេវាដឹក: ${updated.delivery_company || 'N/A'}\n` +
+                          `📝 ចំណាំ: ${updated.note || '-'}`;
+
+           bot.telegram.sendMessage(process.env.SUPERADMIN_ID, ticket, { parse_mode: 'Markdown' })
+              .catch(e => console.error(e));
+        }
+      }
+      
+      if (msg) {
+        bot.telegram.sendMessage(updated.user_id, msg, { parse_mode: 'Markdown' })
+          .catch(e => console.error('Notify Failed:', e.message));
+      }
+    }
+
+    res.json({ success: true, order: updated });
+  } catch (err) { 
+    console.error('Status Error:', err);
+    res.status(500).json({ success: false, error: err.message }); 
+  }
+});
+
+router.post('/orders/confirm', isAdmin, async (req, res) => {
+  try {
+    const { orderId } = req.body;
+    const updateRes = await pool.query(
+      "UPDATE orders SET status = 'paid' WHERE id = $1 AND status != 'paid' RETURNING *", 
+      [orderId]
+    );
+    
+    if (updateRes.rows.length === 0) {
+       return res.status(400).json({ success: false, error: 'Order already confirmed or not found' });
+    }
+    const updated = updateRes.rows[0];
+    
+    if (updated.user_id && bot) {
+       const displayId = updated.order_code || `#MO-${orderId}`;
+       bot.telegram.sendMessage(updated.user_id, `✅ ការបង់ប្រាក់សម្រាប់ ${displayId} ត្រូវបានបញ្ជាក់! អរគុណសម្រាប់ការគាំទ្រពី MO MO Boutique។`).catch(e => console.error(e));
+       
+       // 🎫 Order Ticket for Admin Records
+       if (process.env.SUPERADMIN_ID) {
+          const items = JSON.parse(updated.items || '[]');
+          const itemsList = items.map(it => `- ${it.name} x ${it.quantity}`).join('\n');
+          const ticket = `🎫 *វិក្កយបត្រកម្មង់ដែលបានបង់ប្រាក់*\n` +
+                         `🆔 លេខសម្គាល់: \`${updated.order_code || orderId}\`\n` +
+                         `👤 អតិថិជន: *${updated.user_name}*\n` +
+                         `📞 លេខទូរស័ព្ទ: \`${updated.phone || 'N/A'}\`\n` +
+                         `📍 អាសយដ្ឋាន: ${updated.address || 'N/A'} (${updated.province || ''})\n` +
+                         `📦 ទំនិញ:\n${itemsList}\n` +
+                         `💰 សរុប: *$${updated.total}*\n` +
+                         `🚚 សេវាដឹក: ${updated.delivery_company || 'N/A'}\n` +
+                         `📝 ចំណាំ: ${updated.note || '-'}`;
+
+          bot.telegram.sendMessage(process.env.SUPERADMIN_ID, ticket, { parse_mode: 'Markdown' })
+             .catch(e => console.error(e));
+       }
+    }
+    res.json({ success: true, order: updated });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.post('/notify', isAdmin, async (req, res) => {
+  const { userId, orderId, status } = req.body;
+  const msg = status === 'completed' ? `🎉 #ORDER-${orderId} របស់អ្នករួចរាល់ហើយ!` : `⏳ #ORDER-${orderId} កំពុងរង់ចាំ។`;
+  try {
+    if (bot) await bot.telegram.sendMessage(userId, msg);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false }); }
+});
+
+router.post('/broadcast', isAdmin, async (req, res) => {
+  const { message, photoUrl } = req.body;
+  if (!message && !photoUrl) return res.status(400).json({ success: false, message: 'Content missing' });
+
+  try {
+    const userIds = await getAllUserIds();
+    
+    // 🔥 Background broadcast
+    res.json({ success: true, count: userIds.length });
+
+    console.log(`📣 [Broadcast] Starting for ${userIds.length} users...`);
+
+    for (const uid of userIds) {
+      if (!uid) continue;
+      try {
+        if (photoUrl) {
+          await bot.telegram.sendPhoto(uid, photoUrl, { caption: message, parse_mode: 'Markdown' });
+        } else {
+          await bot.telegram.sendMessage(uid, message, { parse_mode: 'Markdown' });
+        }
+      } catch (e) {
+         console.warn(`⚠️ [Broadcast] Skip ${uid}: ${e.message}`);
+      }
+      
+      // ⏳ Safety throttle: 10 messages/sec (100ms delay)
+      await new Promise(r => setTimeout(r, 100)); 
+    }
+    console.log(`✅ [Broadcast] Finished.`);
+  } catch (err) {
+    console.error('Broadcast Fail:', err);
+    if (!res.headersSent) res.status(500).json({ success: false });
+  }
+});
+
+module.exports = router;

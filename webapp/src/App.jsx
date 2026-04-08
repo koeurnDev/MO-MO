@@ -1,291 +1,294 @@
-import React, { useEffect, useState, lazy, Suspense, useCallback } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import './App.css';
+
+// Context Hooks
+import { useTelegram } from './context/TelegramContext';
+import { useUserState, useUserDispatch } from './context/UserContext';
+import { useShopState, useShopDispatch } from './context/ShopContext';
+import { useCartState, useCartDispatch } from './context/CartContext';
+import { useApi } from './hooks/useApi';
+import { useTelemetry } from './hooks/useTelemetry';
+import { useFeatureFlags } from './context/FeatureFlagContext';
 
 // Components
 import Hero from './components/Hero';
+const UserProfile = lazy(() => import('./components/UserProfile'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const WishlistPage = lazy(() => import('./components/WishlistPage'));
 import CategoryNavigator from './components/CategoryNavigator';
 import PromoBanner from './components/PromoBanner';
 import ProductGrid from './components/ProductGrid';
+import ProductDetail from './components/ProductDetail';
 import CartPage from './components/CartPage';
 import PillFooter from './components/PillFooter';
 import SuccessOverlay from './components/SuccessOverlay';
 import InvoiceModal from './components/InvoiceModal';
-
-const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
-const UserProfile = React.lazy(() => import('./components/UserProfile'));
+import ProfileSkeleton from './components/ui/Skeletons/ProfileSkeleton';
+import AdminSkeleton from './components/ui/Skeletons/AdminSkeleton';
+import ProductSkeleton from './components/ProductSkeleton';
+import OfflineBanner from './components/ui/OfflineBanner';
+import OfflineService from './services/OfflineService';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [view, setView] = useState('home'); 
-  const [isAdminMode, setIsAdminMode] = useState(false);
-  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(true);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [lastOrder, setLastOrder] = useState(null);
-  const [shopStatus, setShopStatus] = useState('open'); 
-  const [deliveryThreshold, setDeliveryThreshold] = useState('50'); 
-  const [deliveryFee, setDeliveryFee] = useState('1.50');
-  const [promoText, setPromoText] = useState('');
-  const [paymentQrUrl, setPaymentQrUrl] = useState('');
-  const [paymentInfo, setPaymentInfo] = useState('');
+  const { tg, isVersionAtLeast, showAlert } = useTelegram();
+  const { user, theme, lang, isSuperAdmin, t } = useUserState();
+  const { 
+    setView, setSelectedProduct, setSelectedCategory, setSearchTerm,
+    setShopStatus, setDeliveryThreshold, setDeliveryFee, setPromoText, setPromoBannerUrl, setShopLogoUrl
+  } = useShopDispatch();
+  const { toggleLang, toggleTheme } = useUserDispatch();
   
-  const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState([]);
-  const [formData, setFormData] = useState({ phone: '', address: '' });
-  const [activeDiscounts, setActiveDiscounts] = useState([]);
+  // 📈 Principal: Initialize Telemetry
+  useTelemetry();
+  
+  const { isEnabled } = useFeatureFlags();
+  const { 
+    view, isSettingsLoaded, shopStatus, products, 
+    deliveryThreshold, promoText, promoBannerUrl, selectedCategory, 
+    selectedProduct, activeDiscounts, shopLogoUrl, deliveryFee,
+    paymentQrUrl, paymentInfo, searchTerm
+  } = useShopState();
+  
+  const { 
+    cart, totalPrice, totalItemsCount, flyingItems, cartIconRef, idempotencyKey 
+  } = useCartState();
+
+  const { addToCart, clearCart, updateQty, handleBulkAddToCart, prepareIdempotency } = useCartDispatch();
+
+  // Local state for specific UI interactions not needed in global context
+  const [showInvoice, setShowInvoice] = React.useState(false);
+  const [showConfetti, setShowConfetti] = React.useState(false);
+  const [lastOrder, setLastOrder] = React.useState(null);
+  const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
+  const [validationErrors, setValidationErrors] = React.useState({});
+  const [formData, setFormData] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem('momo_shipping_info');
+      return saved ? JSON.parse(saved) : {
+        name: user?.first_name || '',
+        phone: '',
+        address: '',
+        province: 'Phnom Penh',
+        note: '',
+        postToTelegram: false,
+        deliveryCompany: 'J&T Express'
+      };
+    } catch (e) { return {}; }
+  });
 
   useEffect(() => {
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-    const isAtLeast61 = tg.isVersionAtLeast ? tg.isVersionAtLeast('6.1') : false;
+    localStorage.setItem('momo_shipping_info', JSON.stringify(formData));
+  }, [formData]);
 
-    if (isAtLeast61) {
-      if (tg.setHeaderColor) tg.setHeaderColor('#ff72a0'); 
-      if (tg.setBackgroundColor) tg.setBackgroundColor('#fff5f7');
-    }
+  // Navigation & BackButton Logic
+  useEffect(() => {
+    if (!tg) return;
+    const handleBack = () => setView('home');
 
-    // 🛍 Fetch public data
-    fetchProducts();
-    fetchShopStatus();
-    fetchDeliveryThreshold();
-    fetchDeliveryFee();
-    fetchPromoText();
-    fetchPaymentQrUrl();
-    fetchPaymentInfo();
-    fetchActiveDiscounts();
-
-    const initData = tg.initData;
-    
-    // 🔙 Telegram BackButton Logic
-    if (isAtLeast61 && tg.BackButton) {
-      const handleBack = () => setView('home');
+    if ((view === 'checkout' || view === 'browse' || view === 'product_detail' || view === 'wishlist') && isVersionAtLeast('6.1')) {
+      tg.BackButton.show();
       tg.BackButton.onClick(handleBack);
-      if (view !== 'home') tg.BackButton.show();
-      else tg.BackButton.hide();
+      return () => tg.BackButton.offClick(handleBack);
+    } else if (isVersionAtLeast('6.1')) {
+      tg.BackButton.hide();
     }
+  }, [view, tg, setView, isVersionAtLeast]);
 
-    if (initData) {
-      fetch(`${BACKEND_URL}/api/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setUser(data.user);
-          setIsSuperAdmin(data.isAdmin);
-          fetchUserInfo(data.user.id);
-        }
-        setIsVerifying(false);
-      })
-      .catch(() => setIsVerifying(false));
-    } else {
-      setIsSuperAdmin(true);
-      setIsVerifying(false);
-    }
-  }, []);
-
-  const fetchShopStatus = () => {
-    fetch(`${BACKEND_URL}/api/settings/shop_status`)
-      .then(res => res.json())
-      .then(data => { if (data.success) setShopStatus(data.status); });
-  };
-
-  const fetchDeliveryThreshold = () => {
-    fetch(`${BACKEND_URL}/api/settings/delivery_threshold`)
-      .then(res => res.json())
-      .then(data => { if (data.success) setDeliveryThreshold(data.threshold); });
-  };
-
-  const fetchDeliveryFee = () => {
-    fetch(`${BACKEND_URL}/api/settings/delivery_fee`)
-      .then(res => res.json())
-      .then(data => { if (data.success) setDeliveryFee(data.fee); });
-  };
-
-  const fetchPromoText = () => {
-    fetch(`${BACKEND_URL}/api/settings/promo_text`)
-      .then(res => res.json())
-      .then(data => { if (data.success) setPromoText(data.promoText); });
-  };
+  const { fetchWithRetry, loading: isApiLoading } = useApi();
   
-  const fetchPaymentQrUrl = () => {
-    fetch(`${BACKEND_URL}/api/settings/payment_qr_url`)
-      .then(res => res.json())
-      .then(data => { if (data.success) setPaymentQrUrl(data.value); });
-  };
-  
-  const fetchPaymentInfo = () => {
-    fetch(`${BACKEND_URL}/api/settings/payment_info`)
-      .then(res => res.json())
-      .then(data => { if (data.success) setPaymentInfo(data.value); });
-  };
+  if (!isSettingsLoaded) {
+    return (
+      <div className="loading-screen" style={{ background: 'var(--bg-app)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="loader" style={{ borderColor: 'var(--primary-accent)', borderTopColor: 'transparent' }}></div>
+      </div>
+    );
+  }
 
-  const fetchProducts = () => {
-    fetch(`${BACKEND_URL}/api/products`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setProducts(data.products);
-      });
-  };
-
-  const fetchActiveDiscounts = () => {
-    fetch(`${BACKEND_URL}/api/active_discounts`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setActiveDiscounts(data.discounts);
-      });
-  };
-
-  const fetchUserInfo = (userId) => {
-    fetch(`${BACKEND_URL}/api/user/${userId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.user) {
-          setFormData({
-            phone: data.user.phone || '',
-            address: data.user.address || ''
-          });
-        }
-      });
-  };
-
-  // ⚡ Optimized Callback for AddToCart to avoid unnecessary re-renders
-  const handleAddToCart = useCallback((product) => {
-    if (shopStatus === 'closed') return;
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
-    setView('checkout');
-  }, [shopStatus]);
-
-  const updateQty = useCallback((id, delta) => {
-    setCart(prev => {
-      const updated = prev.map(item => item.id === id ? { ...item, quantity: item.quantity + delta } : item);
-      return updated.filter(item => item.quantity > 0);
-    });
-  }, []);
-
-  const clearCart = useCallback(() => {
-    setCart([]);
-    setView('home');
-  }, []);
-
-  const handleCheckout = (finalTotal) => {
+  const handleCheckout = async (finalTotal) => {
     if (cart.length === 0) return;
-    setIsPlacingOrder(true);
-    fetch(`${BACKEND_URL}/api/orders`, {
+    
+    const phoneClean = formData.phone.replace(/\s/g, '');
+    if (phoneClean.length < 9 || !formData.address?.trim()) {
+      setValidationErrors({ 
+        phone: phoneClean.length < 9,
+        address: !formData.address?.trim()
+      });
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+      setTimeout(() => setValidationErrors({}), 2000);
+      return;
+    }
+
+    // 🛡️ Persistence Level: Solidify the idempotency key for this attempt
+    const currentKey = idempotencyKey || prepareIdempotency();
+
+    const orderData = {
+      userId: user?.id,
+      userName: user?.first_name || 'Guest',
+      items: cart,
+      total: finalTotal,
+      deliveryInfo: { ...formData, paymentMethod: 'Bakong KHQR' },
+      idempotencyKey: currentKey
+    };
+
+    const requestOptions = {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user?.id,
-        userName: user?.first_name,
-        items: cart,
-        total: finalTotal,
-        deliveryInfo: formData
-      })
-    })
-    .then(res => res.json())
-    .then(data => {
-      setIsPlacingOrder(false);
-      if (data.success) {
-        setLastOrder(data.order);
-        setShowInvoice(true);
-      }
-    })
-    .catch(() => setIsPlacingOrder(false));
+      headers: { 'Content-Type': 'application/json', 'x-tg-data': tg?.initData || '' },
+      body: JSON.stringify(orderData),
+      idempotent: true
+    };
+
+    if (!navigator.onLine) {
+      // 📡 Offline Logic: Queue for sync
+      OfflineService.queueRequest(`${BACKEND_URL}/api/orders`, requestOptions);
+      showAlert(lang === 'kh' ? 'អ្នកមិនទាន់មានអ៊ីនធឺណិតទេ! ការកម្ម៉ង់ត្រូវបានរក្សាទុក ហើយនឹងផ្ញើទៅពេលអ្នកមានអ៊ីនធឺណិតវិញ។' : 'Offline! Your order is saved and will be sent automatically when you are back online.');
+      clearCart(); // Assume success for UX, sync happens in bg
+      setView('home');
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    const result = await fetchWithRetry(`${BACKEND_URL}/api/orders`, requestOptions);
+    setIsPlacingOrder(false);
+    
+    if (result.success) {
+      setLastOrder(result.data.order);
+      setShowInvoice(true);
+    } else {
+      showAlert(result.error || 'Order Failed');
+    }
   };
 
+  const handleConfirmPayment = async (orderCode) => {
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+    const result = await fetchWithRetry(`${BACKEND_URL}/api/orders/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-TG-Data': window.Telegram?.WebApp?.initData || '' },
+      body: JSON.stringify({ orderCode })
+    });
+    
+    if (result.success) {
+      handlePaymentSuccess();
+      return true;
+    } else {
+      tg?.showAlert(result.error || 'Confirmation Failed');
+      return false;
+    }
+  };
   const handlePaymentSuccess = () => {
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
     setShowConfetti(true);
     setTimeout(() => {
       setShowConfetti(false);
-      setCart([]);
+      clearCart();
       setView('home');
     }, 5000);
   };
 
-  useEffect(() => {
-    setIsAdminMode(view === 'admin');
-  }, [view]);
-
-  if (isVerifying) {
-    return <div className="loading-screen"><div className="loader"></div></div>;
-  }
-
-  const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
   return (
-    <div className="app-container">
-      {showConfetti && <SuccessOverlay />}
-      {showInvoice && (
-        <InvoiceModal 
-          order={lastOrder} 
-          onClose={() => setShowInvoice(false)} 
-          paymentQrUrl={paymentQrUrl}
-          paymentInfo={paymentInfo}
-          BACKEND_URL={BACKEND_URL}
-          onPaymentSuccess={handlePaymentSuccess}
-        />
-      )}
-      
-      {shopStatus === 'closed' && view !== 'admin' && (
-        <div className="shop-closed-overlay">
-          <div className="closed-card">
-             <div className="closed-icon">⏳</div>
-             <h2>ហាងកំពុងសម្រាក</h2>
-             <p>យើងនឹងត្រលប់មកវិញក្នុងពេលឆាប់ៗនេះ។ សូមអរគុណ!</p>
-          </div>
-        </div>
-      )}
+    <ErrorBoundary>
+      <div className="app-container">
+        {flyingItems.map(item => (
+          <div key={item.id} className="flying-dot-premium" style={{
+            '--start-x': `${item.startX}px`, '--start-y': `${item.startY}px`,
+            '--end-x': `${item.endX}px`, '--end-y': `${item.endY}px`
+          }}/>
+        ))}
 
-      {isAdminMode ? (
-        <div className="animate-in" style={{ padding: '20px' }}>
-          <Suspense fallback={<div className="loading-screen"><div className="loader"></div></div>}>
-            <AdminDashboard BACKEND_URL={BACKEND_URL} setView={(v) => { setView(v); setIsAdminMode(false); }} />
-          </Suspense>
-        </div>
-      ) : (
-        <>
-          {view === 'profile' && (
-             <Suspense fallback={<div className="loading-screen"><div className="loader"></div></div>}>
-                <UserProfile user={user} setView={setView} BACKEND_URL={BACKEND_URL} onViewInvoice={(order) => { setLastOrder(order); setShowInvoice(true); }} />
-             </Suspense>
-          )}
-
-          {view === 'home' || view === 'browse' ? (
-            <div className="animate-in">
-              <Hero user={user} setView={setView} isAdmin={isSuperAdmin} />
-              {(view === 'home' || view === 'browse') && <PromoBanner threshold={deliveryThreshold} promoText={promoText} />}
-              
-              {view === 'browse' && (
-                 <div style={{ padding: '20px' }}>
-                    <CategoryNavigator searchTerm={searchTerm} setSearchTerm={setSearchTerm} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
-                 </div>
-              )}
-
-              <ProductGrid products={products} searchTerm={searchTerm} selectedCategory={selectedCategory} onAdd={handleAddToCart} activeDiscounts={activeDiscounts} />
+        {showConfetti && <SuccessOverlay />}
+        {showInvoice && (
+          <InvoiceModal 
+            order={lastOrder} onClose={() => setShowInvoice(false)} 
+            paymentQrUrl={paymentQrUrl} paymentInfo={paymentInfo}
+            BACKEND_URL={BACKEND_URL} 
+            onPaymentSuccess={handlePaymentSuccess}
+            onConfirmPayment={handleConfirmPayment}
+            t={t} lang={lang}
+          />
+        )}
+        
+        {shopStatus === 'closed' && view !== 'admin' && (
+          <div className="shop-closed-overlay">
+            <div className="closed-card">
+               <div className="closed-icon">⏳</div>
+               <h2>{t('shop_closed')}</h2>
+               <p>{lang === 'kh' ? 'យើងនឹងត្រលប់មកវិញក្នុងពេលឆាប់ៗនេះ' : 'We will be back soon'}</p>
             </div>
-          ) : (
-            <CartPage cart={cart} updateQty={updateQty} clearCart={clearCart} user={user} formData={formData} setFormData={setFormData} totalPrice={totalPrice} setView={setView} BACKEND_URL={BACKEND_URL} onCheckout={handleCheckout} activeDiscounts={activeDiscounts} deliveryThreshold={deliveryThreshold} deliveryFee={deliveryFee} isPlacingOrder={isPlacingOrder} />
-          )}
-        </>
-      )}
+          </div>
+        )}
 
-      <PillFooter view={view} setView={setView} totalPrice={totalPrice} hidePay={true} isAdmin={isSuperAdmin} />
-    </div>
+        {view === 'admin' ? (
+          <Suspense fallback={<AdminSkeleton />}>
+            <AdminDashboard 
+              BACKEND_URL={BACKEND_URL} 
+              setView={setView} 
+              theme={theme} 
+              setShopStatus={setShopStatus}
+              setDeliveryThreshold={setDeliveryThreshold}
+              setDeliveryFee={setDeliveryFee}
+              setPromoText={setPromoText}
+              setPromoBannerUrl={setPromoBannerUrl}
+              setShopLogoUrl={setShopLogoUrl}
+            />
+          </Suspense>
+        ) : (
+          <>
+            {view === 'profile' && (
+              <Suspense fallback={<ProfileSkeleton />}>
+                <UserProfile user={user} setView={setView} BACKEND_URL={BACKEND_URL} onViewInvoice={(o) => { setLastOrder(o); setShowInvoice(true); }} t={t} lang={lang} toggleLang={toggleLang} theme={theme} toggleTheme={toggleTheme} products={products} handleBulkAddToCart={handleBulkAddToCart} />
+              </Suspense>
+            )}
+            {view === 'wishlist' && isEnabled('BETA_WISH_LIST') && (
+              <Suspense fallback={<div className="p-5"><div className="h-40 bg-bg-soft rounded-3xl animate-pulse"></div></div>}>
+                <WishlistPage products={products} onAdd={addToCart} setView={setView} t={t} lang={lang} />
+              </Suspense>
+            )}
+            {view === 'wishlist' && !isEnabled('BETA_WISH_LIST') && (
+              <div className="p-8 text-center text-muted">Coming Soon...</div>
+            )}
+            {(view === 'home' || view === 'browse') && (
+              <div className="animate-in">
+                <Hero />
+                <PromoBanner threshold={deliveryThreshold} promoText={promoText} promoBannerUrl={promoBannerUrl} t={t} lang={lang} />
+                {view === 'browse' && <CategoryNavigator searchTerm={searchTerm} setSearchTerm={setSearchTerm} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} t={t} />}
+                <ProductGrid />
+              </div>
+            )}
+            {view === 'checkout' && (
+              <CartPage 
+                formData={formData} 
+                setFormData={setFormData} 
+                onPhoneChange={(val) => {
+                  const cleaned = val.replace(/\D/g, '').slice(0, 10);
+                  let formatted = cleaned;
+                  if (cleaned.length > 3 && cleaned.length <= 6) {
+                    formatted = `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
+                  } else if (cleaned.length > 6) {
+                    formatted = `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6)}`;
+                  }
+                  setFormData(prev => ({ ...prev, phone: formatted }));
+                }} 
+                isPhoneValid={formData.phone.replace(/\s/g, '').length >= 9} 
+                isAddressValid={!!formData.address?.trim()}
+                validationErrors={validationErrors} 
+                onCheckout={handleCheckout} 
+                isPlacingOrder={isPlacingOrder} 
+              />
+            )}
+
+          </>
+        )}
+
+        {view === 'product_detail' && selectedProduct && (
+          <ProductDetail product={selectedProduct} allProducts={products} onAdd={addToCart} onClose={() => setView('home')} onBuyNow={(e) => { addToCart(selectedProduct, e); setView('checkout'); }} activeDiscounts={activeDiscounts} t={t} lang={lang} shopLogoUrl={shopLogoUrl} />
+        )}
+
+        <PillFooter view={view} setView={setView} totalPrice={totalPrice} isAdmin={isSuperAdmin} cartCount={totalItemsCount} t={t} lang={lang} />
+        <OfflineBanner />
+      </div>
+    </ErrorBoundary>
   );
 }
 

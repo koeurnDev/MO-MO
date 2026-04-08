@@ -37,8 +37,26 @@ function validateInitData(telegramInitData, botToken) {
     .update(dataCheckString)
     .digest('hex');
     
-  // 6. Compare hashes
-  return calculatedHash === hash;
+  // 6. Compare hashes securely
+  const hashBuffer = Buffer.from(hash, 'hex');
+  const calculatedBuffer = Buffer.from(calculatedHash, 'hex');
+
+  if (hashBuffer.length !== 32 || calculatedBuffer.length !== 32) return false;
+  if (!crypto.timingSafeEqual(hashBuffer, calculatedBuffer)) return false;
+
+  // 7. Check for expiration (Replay Protection)
+  const authDate = parseInt(initData.get('auth_date'), 10);
+  if (!authDate || isNaN(authDate)) return false;
+
+  const now = Math.floor(Date.now() / 1000);
+  
+  // 🛡 Security Fix: Reject future dates (> 60s from now) and old sessions (> 24h)
+  if (authDate > (now + 60) || (now - authDate) > 86400) { 
+    console.error('🔴 Telegram Session Invalid/Expired:', { now, authDate });
+    return false;
+  }
+
+  return true;
 }
 
 module.exports = { validateInitData };
