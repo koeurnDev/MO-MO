@@ -682,7 +682,7 @@ body::-webkit-scrollbar,
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  border: 2px solid white;
+  border: 2px solid var(--bg-surface);
   box-shadow: 0 4px 12px rgba(244, 63, 94, 0.4);
   animation: pulse-badge 1s ease;
 }
@@ -1803,9 +1803,9 @@ h3,
   left: 0;
   right: 0;
   padding: 10px 10px calc(15px + env(safe-area-inset-bottom, 0px));
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--glass-bg);
   backdrop-filter: blur(25px);
-  border-top: 1px solid rgba(255, 255, 255, 0.8);
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -1846,7 +1846,7 @@ h3,
 }
 
 .nav-item.active {
-  color: var(--primary-color);
+  color: var(--primary-accent);
 }
 
 .nav-icon-circle {
