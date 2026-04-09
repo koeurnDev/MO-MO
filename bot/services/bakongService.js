@@ -18,6 +18,12 @@ class BakongService {
       maxSockets: 100,
       keepAliveMsecs: 60000
     });
+
+    this.commonHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
   }
 
   /**
@@ -45,8 +51,8 @@ class BakongService {
         method: 'POST',
         agent: this.agent, // 🚀 Connection Reuse
         headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json'
+          ...this.commonHeaders,
+          'Authorization': `Bearer ${this.token}`
         },
         body: JSON.stringify({ md5 })
       });
@@ -107,8 +113,8 @@ class BakongService {
         method: 'POST',
         agent: this.agent, // 🚀 Connection Reuse
         headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json'
+          ...this.commonHeaders,
+          'Authorization': `Bearer ${this.token}`
         },
         body: JSON.stringify({ md5: dummyMd5 })
       });
