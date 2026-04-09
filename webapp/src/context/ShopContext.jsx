@@ -32,7 +32,15 @@ export const ShopProvider = ({ children }) => {
 
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [view, setView] = useState('home');
+
+  // 🕒 Debounce Search: Prevent expensive re-filtering on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -67,7 +75,7 @@ export const ShopProvider = ({ children }) => {
         refetchProducts(true); // silent refresh
         refetchSettings(true); // silent refresh
       }
-    }, 30000); // 30s sync window
+    }, 300000); // 5m sync window (Eco Mode - Optimized by Audit)
     
     return () => clearInterval(interval);
   }, [refetchProducts, refetchSettings]);
@@ -95,6 +103,7 @@ export const ShopProvider = ({ children }) => {
       isSettingsLoaded: !settingsLoading,
       selectedCategory,
       searchTerm,
+      debouncedSearchTerm, // 🚀 Use this for filtering
       view,
       selectedProduct,
       toast,
@@ -107,7 +116,7 @@ export const ShopProvider = ({ children }) => {
       shopLogoUrl,
       activeDiscounts: settings.active_discounts || []
     };
-  }, [productsData, settingsData, settingsLoading, selectedCategory, searchTerm, view, selectedProduct, toast, shopStatus, deliveryThreshold, deliveryFee, promoText, promoBannerUrl, shopLogoUrl]);
+  }, [productsData, settingsData, settingsLoading, selectedCategory, searchTerm, debouncedSearchTerm, view, selectedProduct, toast, shopStatus, deliveryThreshold, deliveryFee, promoText, promoBannerUrl, shopLogoUrl]);
 
   const dispatch = useMemo(() => ({
     setSelectedCategory,

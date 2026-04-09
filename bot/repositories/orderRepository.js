@@ -56,8 +56,8 @@ const orderRepository = {
     return parseInt(res.rows[0]?.total || 0);
   },
 
-  findAll: async () => {
-    const res = await pool.query('SELECT * FROM orders ORDER BY created_at DESC');
+  findAll: async (limit = 100, offset = 0) => {
+    const res = await pool.query('SELECT * FROM orders ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset]);
     return res.rows;
   },
 

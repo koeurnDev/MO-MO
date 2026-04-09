@@ -5,7 +5,7 @@ const path = require('path');
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-// Use the production URL for the button
+// Use the production URL for the button (no trailing slash)
 const WEBAPP_URL = 'https://tg-mini-app-webapp.onrender.com';
 
 async function setupBot() {

@@ -4,6 +4,7 @@ import ProductSkeleton from './ProductSkeleton';
 import { useShopState, useShopDispatch } from '../context/ShopContext';
 import { useUserState } from '../context/UserContext';
 import { useCartDispatch } from '../context/CartContext';
+import { useTelegram } from '../context/TelegramContext';
 
 const SkeletonGrid = () => (
   <div className="product-grid-main grid grid-cols-2 gap-4 px-5 pb-5">
@@ -14,10 +15,12 @@ const SkeletonGrid = () => (
 );
 
 const ProductGrid = () => {
-  const { products, searchTerm, selectedCategory, activeDiscounts } = useShopState();
+  const [limit, setLimit] = React.useState(14);
+  const { products, searchTerm, debouncedSearchTerm, selectedCategory, activeDiscounts } = useShopState();
   const { setView, setSelectedProduct } = useShopDispatch();
   const { t } = useUserState();
   const { addToCart } = useCartDispatch();
+  const { tg } = useTelegram();
 
   const discountLookup = useMemo(() => {
     const lookup = {};
@@ -36,7 +39,7 @@ const ProductGrid = () => {
   const filtered = useMemo(() => {
     return (products || [])
       .filter(p => {
-        const matchesSearch = (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+        const matchesSearch = (p.name || '').toLowerCase().includes((debouncedSearchTerm || '').toLowerCase());
         const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
         return matchesSearch && matchesCategory;
       })
@@ -45,7 +48,10 @@ const ProductGrid = () => {
         if (a.stock <= 0 && b.stock > 0) return 1;
         return 0;
       });
-  }, [products, searchTerm, selectedCategory]);
+  }, [products, debouncedSearchTerm, selectedCategory]);
+
+  const displayed = useMemo(() => filtered.slice(0, limit), [filtered, limit]);
+  const hasMore = filtered.length > limit;
 
   const featured = useMemo(() => (products || []).filter(p => p.stock > 0).slice(0, 3), [products]);
   const showFeatured = searchTerm === '' && selectedCategory === 'all' && featured.length > 0;
@@ -55,8 +61,13 @@ const ProductGrid = () => {
     setView('product_detail');
   };
 
+  const handleShowMore = () => {
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    setLimit(prev => prev + 20);
+  };
+
   return (
-    <div className="section-container animate-in">
+    <div className="section-container">
       {/* ✨ FEATURED ITEMS */}
       {showFeatured && (
         <div className="mb-6">
@@ -91,24 +102,38 @@ const ProductGrid = () => {
         {products.length === 0 ? (
           <SkeletonGrid />
         ) : (
-          <div className="product-grid-main grid grid-cols-2 gap-4 pb-10">
-            {filtered.length === 0 ? (
-              <div className="col-span-2 text-center py-10 opacity-50">
-                <p>{t('empty_cart')}</p>
-              </div>
-            ) : (
-              filtered.map((product, idx) => (
-                <div key={product.id} className={`stagger-item`} style={{ animationDelay: `${Math.min((idx + 1) * 100, 600)}ms` }}>
-                  <ProductCard 
-                    product={product} 
-                    onAdd={addToCart} 
-                    onViewProduct={handleViewProduct} 
-                    discountLookup={discountLookup} 
-                  />
+          <>
+            <div className="product-grid-main grid grid-cols-2 gap-4 pb-4">
+              {displayed.length === 0 ? (
+                <div className="col-span-2 text-center py-10 opacity-50">
+                  <p>{t('empty_cart')}</p>
                 </div>
-              ))
+              ) : (
+                displayed.map((product, idx) => (
+                  <div key={product.id} className={idx < 6 ? `stagger-item` : ''} style={idx < 6 ? { animationDelay: `${Math.min((idx + 1) * 80, 400)}ms` } : {}}>
+                    <ProductCard 
+                      product={product} 
+                      onAdd={addToCart} 
+                      onViewProduct={handleViewProduct} 
+                      discountLookup={discountLookup} 
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+            
+            {hasMore && (
+              <div className="pb-10 pt-4 flex justify-center">
+                <button 
+                  onClick={handleShowMore}
+                  className="px-10 py-4 rounded-3xl font-black text-sm active:scale-95 transition-transform"
+                  style={{ background: 'var(--bg-soft)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)' }}
+                >
+                   📦 {t('view_all')} ({filtered.length - limit})
+                </button>
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>

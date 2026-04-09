@@ -36,10 +36,12 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     validateEnv();
-    // 1. Initial Database Connection Check with Retry
+    // 1. Initial Database Connection Check with Exponential Backoff
     console.log('⏳ Connecting to Database...');
     let client;
-    let retries = 5;
+    let retries = 3;
+    let delay = 1000; // Start with 1s
+
     while (retries > 0) {
       try {
         client = await pool.connect();
@@ -50,7 +52,10 @@ const startServer = async () => {
         retries--;
         console.warn(`⚠️ DB Connection attempt failed (${err.message}). Retries left: ${retries}`);
         if (retries === 0) throw err;
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s before retry
+        
+        console.log(`🕒 Waiting ${delay}ms before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff: 1s, 2s, 4s
       }
     }
 

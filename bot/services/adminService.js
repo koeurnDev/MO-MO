@@ -50,43 +50,6 @@ const adminService = {
     return { products, settings, categories, discounts };
   },
 
-  bootstrap: async (initData = null) => {
-    const [initDataResult, categories, allSettings] = await Promise.all([
-      adminService.getInitialData(),
-      settingsRepository.getCategories(),
-      settingsRepository.getAll()
-    ]);
-
-    let user = null;
-    let isAdmin = false;
-    let wishlist = [];
-
-    if (initData) {
-      const { validateInitData } = require('../utils/auth');
-      const isValid = validateInitData(initData, process.env.BOT_TOKEN);
-      if (isValid) {
-        const params = new URLSearchParams(initData);
-        const tgUser = JSON.parse(params.get('user') || '{}');
-        const dbUser = await userRepository.findById(tgUser.id);
-        
-        user = { ...tgUser, ...dbUser };
-        isAdmin = Number(tgUser.id) === Number(process.env.SUPERADMIN_ID);
-        
-        const wishlistData = await require('../repositories/wishlistRepository').findByUserId(tgUser.id);
-        wishlist = wishlistData.map(w => w.product_id);
-      }
-    }
-
-    return {
-      ...initDataResult,
-      categories,
-      allSettings,
-      user,
-      isAdmin,
-      wishlist
-    };
-  },
-
   // --- Category Management ---
   getCategories: async () => {
     return await settingsRepository.getCategories();
@@ -129,6 +92,27 @@ const adminService = {
 
   updateOrderStatus: async (orderId, status, trackingNumber) => {
     return await orderRepository.updateStatus(orderId, status, trackingNumber);
+  },
+
+  // 🚀 Consolidated Dashboard API: Reduces 6 parallel calls to 1
+  getDashboardData: async () => {
+    const [summary, analytics, orders, products, categories, settings] = await Promise.all([
+      adminService.getDashboardSummary(),
+      adminService.getAnalytics(),
+      orderRepository.findAll(50), // Limit to 50 recent
+      productRepository.findAllMinimal(), // Optimized selective fetch
+      settingsRepository.getCategories(),
+      settingsRepository.getAll()
+    ]);
+
+    return { 
+      summary, 
+      analytics, 
+      orders, 
+      products, 
+      categories, 
+      settings: settings.settings || {} 
+    };
   }
 };
 

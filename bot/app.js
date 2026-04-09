@@ -6,14 +6,12 @@ const { observabilityLogger, telemetryHandler } = require('./middleware/observab
 const { globalLimiter } = require('./middleware/rateLimiter');
 const { verifyUser, isAdmin } = require('./middleware/auth');
 const validator = require('./middleware/validator');
-const chaosMiddleware = require('./middleware/chaosMiddleware');
 
 // Controller Imports
 const publicController = require('./controllers/publicController');
 const orderController = require('./controllers/orderController');
 const adminController = require('./controllers/adminController');
 const wishlistController = require('./controllers/wishlistController');
-const systemRoutes = require('./routes/systemRoutes');
 
 // Middleware Config
 const { orderCreationLimiter } = require('./middleware/rateLimiter');
@@ -32,8 +30,8 @@ app.set('trust proxy', 1);
 
 // --- Standard Middleware ---
 app.use(compression({
-  level: 9,
-  threshold: 512,
+  level: 6,
+  threshold: 1024,
   filter: (req, res) => {
     if (req.headers['x-no-compression']) return false;
     return compression.filter(req, res);
@@ -49,10 +47,9 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "https://telegram.org", "https://*.telegram.org"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "https://images.unsplash.com", "https://*.telegram.org"],
-      connectSrc: ["'self'", "https://*.telegram.org", process.env.VITE_BACKEND_URL || "https://tg-mini-app-bot.onrender.com", "http://localhost:3005"],
+      connectSrc: ["'self'", "https://*.telegram.org", process.env.VITE_BACKEND_URL || "https://tg-mini-app-bot.onrender.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
-      frameAncestors: ["'self'", "https://t.me", "https://web.telegram.org"],
       upgradeInsecureRequests: [],
     },
   },
@@ -63,40 +60,30 @@ app.use(express.json());
 app.use(observabilityLogger);
 app.use(cors({
   origin: (origin, callback) => {
+    // 🛡️ Strict CORS: localhost only for dev, WEBAPP_URL for production
     const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
-    
-    // 🛡️ Normalized Allowed List
-    const rawWebappUrl = process.env.WEBAPP_URL || '';
-    const cleanWebappUrl = rawWebappUrl.replace(/\/$/, ''); // Remove trailing slash
-    
-    const allowed = [cleanWebappUrl];
+    const allowed = [process.env.WEBAPP_URL];
     if (isDev) {
       allowed.push('http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000');
     }
     
-    // Allow same-origin (null origin) and allowed list
-    const isAllowed = !origin || allowed.filter(Boolean).some(url => origin === url || origin === `${url}/`);
-    
-    if (isAllowed) {
+    if (!origin || allowed.filter(Boolean).includes(origin)) {
       callback(null, true);
     } else {
-      console.warn(`🔴 CORS Blocked: Origin "${origin}" is not in the allowed list:`, allowed.filter(Boolean));
+      console.warn(`⚠️ CORS blocked origin: ${origin}`);
       callback(null, false);
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'X-TG-Data', 'x-tg-data', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'X-TG-Data', 'Authorization']
 }));
 
 // --- Routes ---
 app.get('/', (req, res) => res.send('MO-MO Boutique API Online! ✨'));
 app.get('/api/alive', (req, res) => res.json({ success: true, timestamp: new Date() }));
-app.post('/api/events', telemetryHandler);
+app.post('/api/telemetry', telemetryHandler);
 
-app.use('/api', chaosMiddleware);
 app.use('/api', globalLimiter);
-app.use('/api', systemRoutes);
 
 // ✅ Performance: Stale-While-Revalidate Caching for Products
 app.get('/api/products', (req, res, next) => {
@@ -104,18 +91,15 @@ app.get('/api/products', (req, res, next) => {
   next();
 });
 
-// Bootstrap & Public Routes
-app.post('/api/bootstrap', publicController.bootstrap);
+// Public Routes
 app.get('/api/init', publicController.getInitData);
 app.get('/api/settings', publicController.getSettings);
 app.get('/api/products', publicController.getProducts);
 
 // Order Routes
 app.post('/api/orders', orderCreationLimiter, verifyUser, validator.order, orderController.createOrder);
-app.post('/api/orders/confirm', verifyUser, orderController.confirmOrder);
 app.get('/api/orders/status/:orderCode', verifyUser, orderController.getStatus);
 app.get('/api/user/orders', verifyUser, orderController.getUserOrders);
-app.get('/api/orders/user/:userId', verifyUser, orderController.getUserOrders);
 
 // Wishlist Routes
 app.get('/api/wishlist/:userId', verifyUser, wishlistController.get);
@@ -124,6 +108,7 @@ app.post('/api/wishlist/toggle', verifyUser, wishlistController.toggle);
 // Admin Routes
 app.get('/api/admin/summary', isAdmin, adminController.getSummary);
 app.get('/api/admin/analytics', isAdmin, adminController.getAnalytics);
+app.get('/api/admin/dashboard', isAdmin, (req, res) => adminController.getDashboardData(req, res)); // 🚀 Batch Endpoint (Ensuring visibility)
 app.get('/api/admin/products', isAdmin, adminController.getProducts);
 app.post('/api/admin/products', isAdmin, validator.product, adminController.createProduct);
 app.put('/api/admin/products/:id', isAdmin, adminController.updateProduct);
@@ -146,12 +131,10 @@ app.post('/api/admin/orders/status', isAdmin, adminController.updateOrderStatus)
 
 // --- Global Error Handler (Safety Net) ---
 app.use((err, req, res, next) => {
-  const isDev = process.env.NODE_ENV === 'development';
-  console.error('🔥 Global App Error:', isDev ? err.stack : err.message);
-  
+  console.error('🔥 Global App Error:', err.stack);
   res.status(err.status || 500).json({
     success: false,
-    error: isDev ? err.message : 'An internal processing error occurred'
+    error: err.message || 'Internal Server Error'
   });
 });
 

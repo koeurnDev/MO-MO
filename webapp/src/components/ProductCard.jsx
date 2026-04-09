@@ -36,7 +36,7 @@ const ProductCard = memo(({
 
   const getOptimizedImage = (url) => {
     if (!url || !url.includes('cloudinary')) return url || '';
-    return url.replace('/upload/', '/upload/f_auto,q_auto,w_600,c_fill,g_auto/');
+    return url.replace('/upload/', '/upload/f_auto,q_auto:eco,w_300,c_fill,g_auto/');
   };
 
   return (
@@ -75,18 +75,15 @@ const ProductCard = memo(({
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l8.82-8.82 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
         </button>
-
-        {/* Out of stock indicator removed from overlay */}
       </div>
 
       <div className="card-content-luxury">
-        {/* Out of Stock Label - Positioned below image */}
+        {/* Out of Stock Label */}
         {isOutOfStock && (
-          <div className="pc-out-of-stock-label-simple">
+          <div className="pc-out-of-stock-label">
             {t('out_of_stock')}
           </div>
         )}
-
         {/* Name */}
         <h3 className="card-title-luxury">{product.name}</h3>
 

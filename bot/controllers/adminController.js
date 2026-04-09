@@ -14,6 +14,16 @@ const adminController = {
     }
   },
 
+  getDashboardData: async (req, res) => {
+    try {
+      const data = await adminService.getDashboardData();
+      res.json({ success: true, ...data });
+    } catch (err) {
+      console.error('🔴 Admin Batch Data Error:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+
   getAnalytics: async (req, res) => {
     try {
       const stats = await adminService.getAnalytics();

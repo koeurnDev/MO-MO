@@ -21,7 +21,10 @@ export const UserProvider = ({ children }) => {
     } : null;
   });
   const [lang, setLang] = useState(() => localStorage.getItem('momo_lang') || 'kh');
-  const [theme, setTheme] = useState(() => localStorage.getItem('momo_theme') || 'light');
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('momo_theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'light';
+  });
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // 🛡️ RBAC Monitoring: Automatic Role Detection
@@ -50,14 +53,19 @@ export const UserProvider = ({ children }) => {
 
   const toggleTheme = useCallback(() => {
     setTheme(prev => {
-      const next = prev === 'light' ? 'dark' : 'light';
+      const next = (prev === 'light' ? 'dark' : 'light');
       localStorage.setItem('momo_theme', next);
       document.documentElement.setAttribute('data-theme', next);
       if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
       
-      // Sync with Telegram core UI
-      if (tg?.setHeaderColor) tg.setHeaderColor(next === 'dark' ? '#0f172a' : '#ff72a0');
-      if (tg?.setBackgroundColor) tg.setBackgroundColor(next === 'dark' ? '#020617' : '#fff8f9');
+      // Sync with Telegram core UI (Using strictly validated Hex strings)
+      const headerColor = next === 'dark' ? '#0f172a' : '#ff72a0';
+      const bgColor = next === 'dark' ? '#020617' : '#fff8f9';
+      
+      if (tg?.isVersionAtLeast?.('6.1')) {
+        if (tg.setHeaderColor) tg.setHeaderColor(headerColor);
+        if (tg.setBackgroundColor) tg.setBackgroundColor(bgColor);
+      }
       
       return next;
     });
@@ -65,9 +73,23 @@ export const UserProvider = ({ children }) => {
 
   useEffect(() => {
     if (tg) {
-      const savedTheme = localStorage.getItem('momo_theme') || tg.colorScheme;
-      setTheme(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
+      // 🛡️ Sanitize: Ensure we only accept 'light' or 'dark'
+      const savedTheme = localStorage.getItem('momo_theme');
+      const tgScheme = tg.colorScheme;
+      const finalTheme = (savedTheme === 'light' || savedTheme === 'dark') 
+        ? savedTheme 
+        : (tgScheme === 'dark' ? 'dark' : 'light');
+
+      setTheme(finalTheme);
+      document.documentElement.setAttribute('data-theme', finalTheme);
+      
+      // Initial Sync
+      const hColor = finalTheme === 'dark' ? '#0f172a' : '#ff72a0';
+      const bColor = finalTheme === 'dark' ? '#020617' : '#fff8f9';
+      if (tg?.isVersionAtLeast?.('6.1')) {
+        if (tg.setHeaderColor) tg.setHeaderColor(hColor);
+        if (tg.setBackgroundColor) tg.setBackgroundColor(bColor);
+      }
       
       const savedLang = localStorage.getItem('momo_lang');
       if (!savedLang) {

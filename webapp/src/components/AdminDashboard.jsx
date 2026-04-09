@@ -33,49 +33,21 @@ const AdminDashboard = ({
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [previewData, setPreviewData] = useState(null);
   
-  // 🛰️ Data Fetching with in-flight protection
+  // 🛰️ BATCHED Data Fetching: Reduces 6 parallel connections to 1
   const { 
-    data: summaryData, 
-    loading: summaryLoading, 
-    refetch: refetchSummary 
-  } = useQuery('admin-summary', `${BACKEND_URL}/api/admin/summary`, { headers });
+    data: dashboardData, 
+    loading: dashboardLoading, 
+    refetch: refetchDashboard 
+  } = useQuery('admin-dashboard', `${BACKEND_URL}/api/admin/dashboard`, { headers });
 
-  const { 
-    data: ordersData, 
-    loading: ordersLoading, 
-    refetch: refetchOrders 
-  } = useQuery('admin-orders', `${BACKEND_URL}/api/admin/orders`, { headers });
+  // Derived state from consolidated query
+  const summary = dashboardData?.summary || { totalRevenue: 0, totalOrders: 0, activeOrders: 0, totalCustomers: 0, businessHealth: 100 };
+  const orders = dashboardData?.orders || [];
+  const analytics = dashboardData ? { daily: dashboardData.analytics?.daily || [], status: dashboardData.analytics?.status || [] } : { daily: [], status: [] };
+  const products = dashboardData?.products || [];
+  const categories = dashboardData?.categories || [];
+  const settingsData = dashboardData; // Alias for settings logic compatibility
 
-  const { 
-    data: analyticsData, 
-    loading: analyticsLoading, 
-    refetch: refetchAnalytics 
-  } = useQuery('admin-analytics', `${BACKEND_URL}/api/admin/analytics`, { headers });
-
-  const { 
-    data: productsData, 
-    loading: productsLoading, 
-    refetch: refetchProducts 
-  } = useQuery('products', `${BACKEND_URL}/api/products`, {});
-
-  const { 
-    data: categoriesData, 
-    loading: categoriesLoading, 
-    refetch: refetchCategories 
-  } = useQuery('admin-categories', `${BACKEND_URL}/api/admin/categories`, { headers });
-
-  const { 
-    data: settingsData, 
-    loading: settingsLoading, 
-    refetch: refetchSettings 
-  } = useQuery('admin-settings', `${BACKEND_URL}/api/admin/settings`, { headers });
-
-  // Derived state from queries (admin endpoints return full response; useQuery stores result.data)
-  const summary = summaryData || { totalRevenue: 0, totalOrders: 0, activeOrders: 0, totalCustomers: 0, businessHealth: 100 };
-  const orders = ordersData?.orders || [];
-  const analytics = analyticsData ? { daily: analyticsData.daily || [], status: analyticsData.status || [] } : { daily: [], status: [] };
-  const products = productsData?.products || [];
-  const categories = categoriesData?.categories || [];
   
   // Settings specific state
   const [shopStatus, setShopStatus] = useState('open');
@@ -101,10 +73,7 @@ const AdminDashboard = ({
     }
   }, [settingsData]);
 
-  const loading = (activeTab === 'overview' && (summaryLoading || ordersLoading || analyticsLoading)) ||
-                  (activeTab === 'orders' && ordersLoading) ||
-                  (activeTab === 'products' && (productsLoading || categoriesLoading)) ||
-                  (activeTab === 'settings' && settingsLoading);
+  const loading = dashboardLoading;
 
 
   const [broadcastMsg, setBroadcastMsg] = useState('');
@@ -122,26 +91,15 @@ const AdminDashboard = ({
   const [printingOrder, setPrintingOrder] = useState(null);
 
   const refetchData = useCallback((isBackground = false) => {
-    if (activeTab === 'overview') {
-       refetchSummary();
-       refetchOrders();
-       refetchAnalytics();
-    } else if (activeTab === 'orders') {
-       refetchOrders();
-    } else if (activeTab === 'products') {
-       refetchProducts();
-       refetchCategories();
-    } else if (activeTab === 'settings') {
-       refetchSettings();
-    }
-  }, [activeTab, refetchSummary, refetchOrders, refetchAnalytics, refetchProducts, refetchCategories, refetchSettings]);
+    refetchDashboard();
+  }, [refetchDashboard]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         refetchData(true);
       }
-    }, 45000); // Increased interval to 45s for stability
+    }, 300000); // Increased interval to 5 minutes (300s) for stability as requested by audit
     return () => clearInterval(interval);
   }, [refetchData]);
 
@@ -868,7 +826,6 @@ const AdminDashboard = ({
                      </button>
                   </div>
                </div>
-            </div>
           )}
 
         </div>

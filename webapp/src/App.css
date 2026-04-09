@@ -167,6 +167,7 @@ body::-webkit-scrollbar,
   transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   -webkit-user-select: none;
   user-select: none;
+  will-change: transform, opacity; /* 🚀 GPU Acceleration */
 }
 
 .product-card-luxury:hover {
@@ -244,8 +245,9 @@ body::-webkit-scrollbar,
   border-radius: 100px;
   font-size: 11px;
   font-weight: 800;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  backdrop-filter: none;
+  background: rgba(251, 191, 36, 0.4);
+  border: 1px solid rgba(251, 191, 36, 0.5);
   z-index: 5;
 }
 
@@ -596,8 +598,7 @@ body::-webkit-scrollbar,
 }
 
 .out-of-stock-overlay span {
-  background: #0f172a;
-  color: white;
+  background: rgba(15, 23, 42, 0.7);
   padding: 6px 14px;
   border-radius: 100px;
   font-size: 10px;
@@ -749,9 +750,15 @@ h3,
   }
 }
 
+.animate-in {
+  animation: slide-up-fade 0.3s ease-out forwards;
+  will-change: transform, opacity;
+}
+
 .stagger-item {
   opacity: 0;
-  animation: slide-up-fade 0.5s ease-out forwards;
+  animation: slide-up-fade 0.3s ease-out forwards;
+  will-change: transform, opacity;
 }
 
 .delay-100 {
@@ -885,7 +892,7 @@ h3,
   letter-spacing: -0.5px;
 }
 
-/* ðŸŽ Horizontal Featured Slider */
+/* ðŸ Ž Horizontal Featured Slider */
 .featured-slider {
   display: flex;
   overflow-x: auto;
@@ -1136,7 +1143,7 @@ h3,
 
 
 
-/* ðŸ–¼ï¸ Luxury Ads Hero Poster */
+/* ðŸ–¼ï¸  Luxury Ads Hero Poster */
 .ads-hero-container {
   padding: 0 20px 25px;
   margin-top: -10px;
@@ -1284,6 +1291,7 @@ h3,
 /* ðŸ›’ Cart & Checkout Overhaul */
 .checkout-section {
   padding: 20px;
+  will-change: transform, opacity; /* 🚀 GPU Acceleration */
 }
 
 .cart-list-modern {
@@ -1579,7 +1587,7 @@ h3,
   opacity: 0.9;
 }
 
-/* ðŸ¦ PAYMENT SELECTOR LUXURY STYLES */
+/* ðŸ ¦ PAYMENT SELECTOR LUXURY STYLES */
 .payment-selector-boutique {
   margin-bottom: 25px;
 }
@@ -1764,7 +1772,7 @@ h3,
   animation: pulse-standard 0.4s ease-out;
 }
 
-/* ðŸ” Executive 22yr: Luxury Brand Success Palette */
+/* ðŸ ” Executive 22yr: Luxury Brand Success Palette */
 .success-accent-luxury {
   color: var(--primary-color);
   text-shadow: 0 0 15px rgba(255, 114, 160, 0.4);
@@ -1803,9 +1811,10 @@ h3,
   left: 0;
   right: 0;
   padding: 10px 10px calc(15px + env(safe-area-inset-bottom, 0px));
-  background: var(--glass-bg);
-  backdrop-filter: blur(25px);
+  background: var(--bg-surface);
   border-top: 1px solid var(--border-subtle);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -2347,7 +2356,7 @@ h3,
   color: var(--success-color);
 }
 
-/* ðŸŽŸ Admin Coupon Cards */
+/* 🎟 Admin Coupon Cards */
 .coupon-grid-premium {
   display: flex;
   flex-direction: column;
@@ -2358,9 +2367,7 @@ h3,
 .theme-toggle-pill {
   height: 44px;
   padding: 0 16px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg-soft);
   border: 1px solid var(--border-subtle);
   border-radius: 100px;
   display: flex;
@@ -2512,7 +2519,7 @@ h3,
   color: var(--error-color);
 }
 
-/* ðŸ’  Global Input Polish: Hide Number Spinners for better Keyboard experience */
+/* 🛑 Global Input Polish: Hide Number Spinners for better Keyboard experience */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   appearance: none;
@@ -2525,7 +2532,7 @@ input[type=number] {
   -moz-appearance: textfield;
 }
 
-/* ðŸŒŸ Hero Luxury Header */
+/* 🌟 Hero Luxury Header */
 .hero-section {
   padding: 25px 20px 10px;
   background: var(--bg-surface);
@@ -2537,7 +2544,7 @@ input[type=number] {
   z-index: 10;
 }
 
-/* ðŸ‘¤ SENIOR PRINCIPAL (v3): Restoring Header & Fixing Symmetry Clumping */
+/* 👤 SENIOR PRINCIPAL (v3): Restoring Header & Fixing Symmetry Clumping */
 .hero-actions-right {
   display: flex;
   gap: 10px;
@@ -2548,9 +2555,7 @@ input[type=number] {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--bg-soft);
   padding: 5px 15px 5px 5px;
   border-radius: 50px;
   border: 1px solid var(--border-subtle);
@@ -2578,8 +2583,6 @@ input[type=number] {
   border-radius: 50%;
   border: 1px solid var(--border-subtle);
   background: var(--bg-soft);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   color: var(--text-bold);
   display: flex;
   align-items: center;
@@ -2602,11 +2605,9 @@ input[type=number] {
   box-shadow: 0 8px 25px rgba(236, 72, 153, 0.25);
 }
 
-/* ðŸ› Unified Boutique Product Cards (Non-Clumping) */
+/* 🛍 Unified Boutique Product Cards (Non-Clumping) */
 .product-card-luxury {
-  background: var(--glass-bg);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: var(--bg-surface);
   border-radius: 24px;
   border: 1px solid var(--border-subtle);
   padding: 12px;
@@ -2637,10 +2638,10 @@ input[type=number] {
   transition: transform 0.8s ease;
 }
 
-/* ðŸ’– Standardized Heart (No Clumping) */
+/* 💖 Standardized Heart (No Clumping) */
 /* DELETED DUPLICATE WISH STYLES - MOVED TO CONSOLIDATED SECTION */
 
-/* ðŸ· Standardized Sale (No Clumping) */
+/* 🏷 Standardized Sale (No Clumping) */
 .luxury-sale-tag {
   position: absolute;
   top: 10px;
@@ -2700,7 +2701,7 @@ input[type=number] {
   font-weight: 800;
 }
 
-/* âž• Unified Logic (+ Button) */
+/* ➕ Unified Logic (+ Button) */
 .add-btn-luxury {
   width: 42px;
   height: 42px;
@@ -2770,9 +2771,7 @@ input[type=number] {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg-soft);
   padding: 8px 24px 8px 8px;
   border-radius: 100px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
@@ -2866,10 +2865,11 @@ input[type=number] {
   stroke: currentColor;
 }
 
-/* ðŸ›’ Modern Cart & Checkout Styles */
+/* 🛒 Modern Cart & Checkout Styles */
 .checkout-section {
   padding: 20px;
   padding-bottom: 120px;
+  will-change: transform, opacity; /* 🚀 GPU Acceleration */
 }
 
 .back-btn-pill {
@@ -3206,7 +3206,7 @@ input[type=number] {
   cursor: pointer;
 }
 
-/* ðŸ’³ Checkout Overhaul Styles (Modern & Professional) */
+/* 💳 Checkout Overhaul Styles (Modern & Professional) */
 .checkout-header-luxury {
   display: flex;
   position: relative;
@@ -3331,7 +3331,7 @@ input[type=number] {
   border: 1px solid var(--border-subtle);
 }
 
-/* ðŸšš Carrier Selection Grid Styles */
+/* 🚚 Carrier Selection Grid Styles */
 .carrier-selection-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3513,7 +3513,7 @@ input[type=number] {
   line-height: 1.5;
 }
 
-/* ðŸ“Š Summary Column Styles */
+/* 📊 Summary Column Styles */
 .summary-box-clean {
   background: var(--bg-surface);
   padding: 25px;
@@ -3596,7 +3596,7 @@ input[type=number] {
   gap: 10px;
 }
 
-/* ðŸ‘¤ User Profile & Settings Styles */
+/* 👤 User Profile & Settings Styles */
 .profile-page {
   padding: 20px;
   padding-bottom: 100px;
@@ -3851,9 +3851,7 @@ input:checked+.toggle-slider:before {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 25px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-soft);
   padding: 15px 25px;
   border-radius: 30px;
   box-shadow: var(--shadow-soft);
@@ -4039,7 +4037,7 @@ input:checked+.toggle-slider:before {
 
 
 
-/* ðŸ’  Tab Content Luxury Wrapper */
+/* 💡 Tab Content Luxury Wrapper */
 .tab-content-wrapper {
   margin-top: 5px;
   min-height: 400px;
@@ -4071,7 +4069,6 @@ input:checked+.toggle-slider:before {
   padding: 60px 20px;
   text-align: center;
   background: var(--bg-surface);
-  backdrop-filter: blur(10px);
   border-radius: 30px;
   border: 1px dashed var(--border-subtle);
   box-shadow: var(--shadow-soft);
@@ -4096,7 +4093,7 @@ input:checked+.toggle-slider:before {
   opacity: 0.8;
 }
 
-/* ðŸ§ª Admin BI & Management Overhaul */
+/* 🧪 Admin BI & Management Overhaul */
 .admin-stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -4185,7 +4182,7 @@ input:checked+.toggle-slider:before {
   opacity: 0.15;
 }
 
-/* ðŸ‘¥ Executive Customer List */
+/* 👥 Executive Customer List */
 .customer-rank-list {
   display: flex;
   flex-direction: column;
@@ -4229,7 +4226,7 @@ input:checked+.toggle-slider:before {
   color: var(--success-color);
 }
 
-/* ðŸ”¥ Phase 2: Advanced BI Insights */
+/* 🔥 Phase 2: Advanced BI Insights */
 .insight-section-header {
   display: flex;
   justify-content: space-between;
@@ -4321,7 +4318,7 @@ input:checked+.toggle-slider:before {
   color: var(--text-muted);
 }
 
-/* ðŸ’Ž Phase 3: The Strategist */
+/* 💎 Phase 3: The Strategist */
 .gauge-container {
   display: flex;
   flex-direction: column;
@@ -4401,7 +4398,7 @@ input:checked+.toggle-slider:before {
   border: 1px solid #fef3c7;
 }
 
-/* ðŸ”® Phase 4: The Futurist (Data Science) */
+/* 🔮 Phase 4: The Futurist (Data Science) */
 .forecast-line-pro {
   stroke-dasharray: 4, 4;
   opacity: 0.6;
@@ -4954,23 +4951,15 @@ input:checked+.toggle-slider:before {
 }
 
 
-/* ðŸ¦´ Luxury Skeleton System */
-.luxury-skeleton,
-.skeleton {
-  background: linear-gradient(90deg, var(--bg-soft) 25%, var(--bg-input) 50%, var(--bg-soft) 75%);
-  background-size: 200% 100%;
-  animation: luxury-shimmer 1.5s infinite linear;
-  border-radius: 12px;
+@keyframes luxury-shimmer {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
-@keyframes luxury-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
-  }
+.skeleton {
+  background: var(--bg-soft);
+  animation: luxury-shimmer 2s infinite ease-in-out;
+  border-radius: 12px;
 }
 
 .skeleton-card {
@@ -5008,15 +4997,13 @@ input:checked+.toggle-slider:before {
   border-radius: 6px;
 }
 
-/* Apply shimmer to all skeleton parts */
 .skeleton-img,
 .skeleton-title,
 .skeleton-price,
 .skeleton-text,
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-soft) 25%, var(--bg-input) 50%, var(--bg-soft) 75%) !important;
-  background-size: 200% 100% !important;
-  animation: luxury-shimmer 1.5s infinite linear;
+  background: var(--bg-soft) !important;
+  animation: luxury-shimmer 2s infinite ease-in-out !important;
 }
 
 /* ðŸ›’ Added to Cart Success Feedback */
@@ -7450,26 +7437,34 @@ input:checked+.toggle-slider:before {
 }
 
 /* ============================================================
-   ðŸ›ï¸ PRODUCT CARD â€” Clean CSS (No Tailwind)
+   🛍️ PRODUCT CARD — Clean CSS (No Tailwind)
    ============================================================ */
 
 .pc-out-of-stock {
   opacity: 1; /* Keep image fully clear as per user request */
 }
 
-.pc-out-of-stock-label-simple {
+.pc-out-of-stock-label {
   display: inline-block;
-  color: #ef4444; /* Soft red for status indicator */
-  background: #fef2f2;
-  padding: 4px 10px;
+  background: var(--bg-soft);
+  color: #ef4444; /* Use a soft red for clear visibility */
+  padding: 4px 12px;
   border-radius: 8px;
-  font-size: 11px;
-  font-weight: 900;
+  font-size: 10px;
+  font-weight: 950;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-  border: 1px solid #fee2e2;
-  text-align: center;
+  letter-spacing: 0.8px;
+  margin-bottom: 2px;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  width: fit-content;
+}
+
+/* Ensure wishlist button is always visible on any image background */
+.card-wishlist-btn-lux {
+  background: rgba(0, 0, 0, 0.15) !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
 .pc-discount-badge {
