@@ -2,6 +2,18 @@ const pool = require('../config/database');
 
 const orderRepository = {
   create: async (o, client = pool) => {
+    // 🛡️ Self-Healing Migration: Ensure new columns exist (Crucial for Production/Render)
+    try {
+      await client.query(`
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS subtotal DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS gross_total DECIMAL(12,2) DEFAULT 0;
+      `);
+    } catch (e) {
+      console.warn('⚠️ Migration Guard: Non-critical failure (Columns might already exist or permission issue)');
+    }
+
     const res = await client.query(
       `INSERT INTO orders 
        (user_id, user_name, items, total, qr_string, phone, address, province, note, delivery_company, payment_method, order_code, idempotency_key, expires_at, status, subtotal, discount_amount, delivery_fee, gross_total) 

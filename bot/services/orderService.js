@@ -88,8 +88,7 @@ const orderService = {
         totalItemDiscount += (realProduct.price - discountedPrice) * cartItem.quantity;
       }
 
-      const bundleBonus = totalQty >= 3 ? (grossTotal * 0.05) : 0;
-      const subtotal = Math.max(0, grossTotal - totalItemDiscount - bundleBonus);
+      const subtotal = Math.max(0, grossTotal - totalItemDiscount);
       const deliveryFee = subtotal >= threshold ? 0 : fee;
       const calculatedTotal = parseFloat((subtotal + deliveryFee).toFixed(2));
 
