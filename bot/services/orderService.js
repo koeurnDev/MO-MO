@@ -80,7 +80,8 @@ const orderService = {
         const bakongId = process.env.MERCHANT_BAKONG_ID || await settingsRepository.get('bakong_account_id');
         const merchantName = process.env.BAKONG_MERCHANT_NAME || await settingsRepository.get('bakong_merchant_name');
         
-        if (bakongId) {
+        if (bakongId && bakongId.trim() !== '') {
+          console.log(`🏦 EDA: Generating KHQR for Account: ${bakongId}`);
           const qrResult = KHQR.generate({
             tag: TAG.INDIVIDUAL,
             accountID: bakongId,

@@ -38,6 +38,11 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
   const [isConfirming, setIsConfirming] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   
+  // 🔄 Sync local order when parent prop updates (Essential for Draft -> Real transition)
+  useEffect(() => {
+    if (order) setLocalOrder(order);
+  }, [order]);
+
   if (!localOrder) return null;
   
   const isDraft = localOrder.id === 'DRAFT';
@@ -85,6 +90,9 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
       if (attempts > 60) { clearInterval(interval); return; }
 
       const tgData = window.Telegram?.WebApp?.initData || '';
+      // 🛡️ Guard: Skip polling if order is still a DRAFT (...)
+      if (!localOrder.order_code || localOrder.order_code === '...') return;
+
       fetch(`${BACKEND_URL}/api/orders/status/${localOrder.order_code}`, {
         headers: { 'X-TG-Data': tgData }
       })

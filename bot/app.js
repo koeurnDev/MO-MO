@@ -81,7 +81,7 @@ app.use(cors({
 // --- Routes ---
 app.get('/', (req, res) => res.send('MO-MO Boutique API Online! ✨'));
 app.get('/api/alive', (req, res) => res.json({ success: true, timestamp: new Date() }));
-app.post('/api/telemetry', telemetryHandler);
+app.post('/api/v1/ux-sync', telemetryHandler);
 
 app.use('/api', globalLimiter);
 
