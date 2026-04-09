@@ -56,6 +56,21 @@ const publicController = {
       console.error('🔴 Public Discounts Error:', err.message);
       res.status(500).json({ success: false, error: 'Failed to fetch discounts' });
     }
+  },
+
+  getFlags: async (req, res) => {
+    try {
+      // 🚀 Feature Flags: Can be moved to DB settings later for dynamic control
+      const flags = {
+        BETA_WISH_LIST: true,
+        NEW_CHECKOUT_FLOW: true,
+        PREMIUM_ADMIN_STATS: true,
+        SEARCH_DEBOUNCE: true
+      };
+      res.json({ success: true, data: { flags } });
+    } catch (err) {
+      res.status(500).json({ success: false });
+    }
   }
 };
 

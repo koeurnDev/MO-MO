@@ -197,16 +197,30 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
                 <div className="khqr-amount-lux">${parseFloat(localOrder.total).toFixed(2)}</div>
 
                 <div className="qr-code-wrapper-lux">
-                   {(dynamicQr || paymentQrUrl) ? (
-                     <img src={dynamicQr || paymentQrUrl} alt="KHQR" />
+                   {dynamicQr || paymentQrUrl ? (
+                     <img src={dynamicQr || paymentQrUrl} alt="KHQR" onContextMenu={(e) => e.preventDefault()} />
                    ) : (
-                     <div style={{ width: '220px', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div className="loader"></div>
+                     <div style={{ width: '220px', height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                        {timeLeft < 290 ? ( // 🛡️ Fallback: Show manual info if QR takes > 10s
+                          <div className="animate-in" style={{ textAlign: 'center', padding: '15px' }}>
+                            <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏦</div>
+                            <div style={{ fontSize: '12px', fontWeight: '950', color: 'var(--text-bold)', textTransform: 'uppercase', marginBottom: '8px' }}>Manual Payment</div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', background: 'var(--bg-soft)', padding: '10px', borderRadius: '12px', wordBreak: 'break-all' }}>
+                              {paymentInfo || 'ABA: 000 000 000 (MOMO)'}
+                            </div>
+                            <div style={{ fontSize: '10px', marginTop: '10px', color: '#ef4444', fontWeight: 700 }}>{lang === 'kh' ? 'សាកល្បងបើកឡើងវិញដើម្បីទទួល QR' : 'Try reopening to refresh QR'}</div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="loader"></div>
+                            <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: 1 }}>{lang === 'kh' ? 'កំពុងបង្កើត KHQR...' : 'Generating Secure KHQR...'}</span>
+                          </>
+                        )}
                      </div>
                    )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#e11d48', fontWeight: 950, fontSize: 18, marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: timeLeft < 60 ? '#ef4444' : 'var(--text-muted)', fontWeight: 950, fontSize: 18, marginBottom: 24 }}>
                    <span style={{ opacity: 0.6 }}>⏳</span>
                    {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                 </div>

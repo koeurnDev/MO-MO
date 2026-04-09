@@ -7,6 +7,7 @@ const notificationService = require('./notificationService');
 const QueueService = require('./QueueService');
 const pool = require('../config/database');
 const { calculateBestDiscount, getDiscountedPrice } = require('../utils/discountUtils');
+const { KHQR, TAG, CURRENCY, COUNTRY } = require('ts-khqr');
 
 const orderService = {
   /**
@@ -73,11 +74,38 @@ const orderService = {
       const { customAlphabet } = require('nanoid');
       const orderCode = `MO-${customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 8)()}`;
       
+      // 🚀 Synchronous QR Production: Essential for UX
+      let qrString = '';
+      try {
+        const bakongId = process.env.MERCHANT_BAKONG_ID || await settingsRepository.get('bakong_account_id');
+        const merchantName = process.env.BAKONG_MERCHANT_NAME || await settingsRepository.get('bakong_merchant_name');
+        
+        if (bakongId) {
+          const qrResult = KHQR.generate({
+            tag: TAG.INDIVIDUAL,
+            accountID: bakongId,
+            merchantName: merchantName || 'MO MO Boutique',
+            merchantCity: 'Phnom Penh',
+            amount: String(calculatedTotal.toFixed(2)),
+            currency: CURRENCY.USD,
+            countryCode: COUNTRY.KH,
+            expirationTimestamp: Date.now() + 15 * 60 * 1000, 
+            additionalData: { billNumber: orderCode }
+          });
+          if (qrResult?.data && qrResult.status.code === 0) {
+            qrString = qrResult.data.qr;
+          }
+        }
+      } catch (qrErr) {
+        console.error('🔴 QR Production Fail:', qrErr.message);
+      }
+
       const order = await orderRepository.create({
         user_id: userId,
         user_name: userName || 'Guest',
         items: JSON.stringify(items),
         total: calculatedTotal,
+        qr_string: qrString,
         phone: deliveryInfo?.phone || '',
         address: deliveryInfo?.address || '',
         province: deliveryInfo?.province || 'Phnom Penh',
@@ -107,8 +135,7 @@ const orderService = {
           }
         }
 
-        // C. Customer Gratification
-        await this.generateQR(order).catch(console.error);
+        // C. Clean logic: QR is now generated synchronously for UX
         // 🛡️ Principal: Admin notification deferred until payment confirmation
       });
 

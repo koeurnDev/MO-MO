@@ -18,7 +18,7 @@ const UserProfile = ({ user, setView, BACKEND_URL, onViewInvoice, t, lang, toggl
 
   const fetchOrders = () => {
     if (!user?.id) return;
-    fetch(`${BACKEND_URL}/api/orders/user/${user.id}`, {
+    fetch(`${BACKEND_URL}/api/user/orders`, {
        headers: { 'X-TG-Data': window.Telegram.WebApp.initData }
     })
     .then(res => res.json())

@@ -95,6 +95,7 @@ app.get('/api/products', (req, res, next) => {
 app.get('/api/init', publicController.getInitData);
 app.get('/api/settings', publicController.getSettings);
 app.get('/api/products', publicController.getProducts);
+app.get('/api/flags', publicController.getFlags); // 🚀 Combined Feature Flags
 
 // Order Routes
 app.post('/api/orders', orderCreationLimiter, verifyUser, validator.order, orderController.createOrder);
