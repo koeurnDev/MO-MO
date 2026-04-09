@@ -77,7 +77,19 @@ export const ShopProvider = ({ children }) => {
       }
     }, 60000); // 1m sync window (Optimized for Real-time Stock Sync)
     
-    return () => clearInterval(interval);
+    // 👁️ Auto-Refresh on View: Trigger sync when user focuses the app
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refetchProducts(true);
+        refetchSettings(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [refetchProducts, refetchSettings]);
 
   // Sync settings state with query result
