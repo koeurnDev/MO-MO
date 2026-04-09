@@ -75,7 +75,7 @@ export const ShopProvider = ({ children }) => {
         refetchProducts(true); // silent refresh
         refetchSettings(true); // silent refresh
       }
-    }, 300000); // 5m sync window (Eco Mode - Optimized by Audit)
+    }, 60000); // 1m sync window (Optimized for Real-time Stock Sync)
     
     return () => clearInterval(interval);
   }, [refetchProducts, refetchSettings]);

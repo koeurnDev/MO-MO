@@ -85,9 +85,9 @@ app.post('/api/v1/ux-sync', telemetryHandler);
 
 app.use('/api', globalLimiter);
 
-// ✅ Performance: Stale-While-Revalidate Caching for Products
+// ✅ Performance: Stale-While-Revalidate Caching for Products (Optimized for Real-time Stock)
 app.get('/api/products', (req, res, next) => {
-  res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+  res.set('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=30');
   next();
 });
 

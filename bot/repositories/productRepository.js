@@ -104,9 +104,8 @@ const productRepository = {
       throw new Error('Some items are out of stock or invalid');
     }
     
-    // 🚀 Invalidate inventory cache on stock deduction
-    await cacheService.delete(CACHE_KEYS.inventoryStats);
-    await cacheService.delete(CACHE_KEYS.minimalProducts);
+    // 🚀 Invalidate all relevant caches on stock change
+    await cacheService.clearPattern('products:*');
     
     return res.rows;
   },
@@ -116,6 +115,8 @@ const productRepository = {
       'UPDATE products SET stock = stock + $1 WHERE id = $2 RETURNING *',
       [qty, id]
     );
+    // 🚀 Invalidate cache on stock change
+    await cacheService.clearPattern('products:*');
     return res.rows[0];
   },
 
