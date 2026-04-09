@@ -51,9 +51,16 @@ class BakongService {
         body: JSON.stringify({ md5 })
       });
 
-      const result = await response.json();
+      let result;
+      const responseText = await response.text();
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('🔴 Bakong API returned non-JSON response (WAF/Block?):', responseText.substring(0, 500));
+        return { success: false, message: 'Bakong Gateway returned an invalid response (Blocked?)' };
+      }
       
-      if (process.env.NODE_ENV !== 'production' || true) { // Force log for debugging verification issues
+      if (process.env.NODE_ENV !== 'production' || true) { 
         console.log(`📡 Bakong API Response for ${md5}:`, JSON.stringify(result));
       }
 
@@ -106,7 +113,14 @@ class BakongService {
         body: JSON.stringify({ md5: dummyMd5 })
       });
 
-      const result = await response.json();
+      let result;
+      const responseText = await response.text();
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('🔴 Bakong Health Check returned non-JSON:', responseText.substring(0, 500));
+        return { success: false, message: 'Connectivity Blocked by Gateway' };
+      }
       
       const responseCode = result.responseCode !== undefined ? result.responseCode : result.status?.code;
       const errorCode = result.errorCode !== undefined ? result.errorCode : result.status?.errorCode;
