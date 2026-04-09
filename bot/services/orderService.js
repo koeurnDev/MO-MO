@@ -27,7 +27,11 @@ const orderService = {
       const health = await bakongService.checkHealth();
       if (!health.success) {
         console.error('🔴 Gateway Pre-flight Failed:', health.message);
-        throw new Error('ប្រព័ន្ធបង់ប្រាក់កំពុងរវល់ ឬថែទាំ (Maintenance)។ សូមមេត្តាព្យាយាមម្តងទៀតក្នុងរយៈពេល ៥ នាទីទៀត។');
+        const isAdmin = String(userId) === String(process.env.SUPERADMIN_ID);
+        const errorMessage = isAdmin 
+          ? `🛠 [ADMIN ONLY] Bakong Error: ${health.message}. ពិនិត្យ Render Env Variables!` 
+          : 'ប្រព័ន្ធបង់ប្រាក់កំពុងរវល់ ឬថែទាំ (Maintenance)។ សូមមេត្តាព្យាយាមម្តងទៀតក្នុងរយៈពេល ៥ នាទីទៀត។';
+        throw new Error(errorMessage);
       }
 
       if (String(tgUser.id) !== String(userId)) {
