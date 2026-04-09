@@ -215,7 +215,13 @@ function App() {
         {showConfetti && <SuccessOverlay />}
         {showInvoice && (
           <InvoiceModal 
-            order={lastOrder} onClose={() => setShowInvoice(false)} 
+            order={lastOrder} 
+            onClose={() => {
+              setShowInvoice(false);
+              // 🛡️ Cleanup: If user closes the modal, clear the idempotency key 
+              // so the next attempt at checkout is fresh and has a full 5-min window.
+              if (prepareIdempotency) prepareIdempotency(); 
+            }} 
             paymentQrUrl={paymentQrUrl} paymentInfo={paymentInfo}
             BACKEND_URL={BACKEND_URL} 
             onPaymentSuccess={handlePaymentSuccess}

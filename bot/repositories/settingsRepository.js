@@ -13,8 +13,14 @@ const CACHE_KEYS = {
 
 const settingsRepository = {
   get: async (key) => {
-    const res = await pool.query('SELECT value FROM settings WHERE key = $1', [key]);
-    return res.rows[0]?.value;
+    return await cacheService.getOrFetch(
+      `settings:val:${key}`,
+      async () => {
+        const res = await pool.query('SELECT value FROM settings WHERE key = $1', [key]);
+        return res.rows[0]?.value;
+      },
+      CACHE_TTL.settings
+    );
   },
 
   getAll: async () => {

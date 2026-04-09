@@ -57,10 +57,13 @@ class CacheService {
       if (redisRest) {
         data = await redisRest.get(key);
         if (data) {
-          // console.log(`✅ Cache HIT (REST): ${key}`);
-          return JSON.parse(data);
+          if (typeof data === 'object') return data;
+          try {
+            return JSON.parse(data);
+          } catch (e) {
+            return data; // Return as-is if not valid JSON
+          }
         }
-        // console.log(`⏭️ Cache MISS (REST): ${key}`);
         return null;
       }
 
@@ -68,10 +71,13 @@ class CacheService {
       if (redisClient?.isOpen) {
         data = await redisClient.get(key);
         if (data) {
-          // console.log(`✅ Cache HIT (TCP): ${key}`);
-          return JSON.parse(data);
+          if (typeof data === 'object') return data;
+          try {
+            return JSON.parse(data);
+          } catch (e) {
+            return data;
+          }
         }
-        // console.log(`⏭️ Cache MISS (TCP): ${key}`);
         return null;
       }
 

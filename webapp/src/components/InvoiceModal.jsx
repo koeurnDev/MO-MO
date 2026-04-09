@@ -35,8 +35,9 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
   const [miniQrUrl, setMiniQrUrl] = useState('');
   const [dynamicQr, setDynamicQr] = useState('');
   const [isExpired, setIsExpired] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [attempts, setAttempts] = useState(0);
   
   // 🔄 Sync local order when parent prop updates (Essential for Draft -> Real transition)
   useEffect(() => {
@@ -52,15 +53,32 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
 
   const orderStatus = localOrder.status;
 
+  // 🕒 SERVER-SYNCED TIMER: Direct sync with Server's expires_in
   useEffect(() => {
     if (orderStatus === 'paid' || isExpired) return;
-    if (timeLeft <= 0) {
-       setIsExpired(true);
-       return;
+
+    // Use server's remaining time directly
+    const initialRemaining = localOrder.expires_in !== undefined ? localOrder.expires_in : 300;
+    
+    setTimeLeft(initialRemaining);
+    if (initialRemaining <= 0 && !isDraft) {
+      setIsExpired(true);
+      return;
     }
-    const timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setIsExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
     return () => clearInterval(timer);
-  }, [orderStatus, timeLeft, isExpired]);
+  }, [orderStatus, isDraft, localOrder.expires_in, isExpired]);
 
   useEffect(() => {
     if (showReceipt) {
@@ -81,42 +99,74 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
     }
   }, [localOrder?.qr_string]);
 
+  // 🚀 HARDENED: Exponential Backoff Polling with Network Resilience
   useEffect(() => {
-    if (orderStatus === 'paid') return;
-    let attempts = 0;
-    const interval = setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      attempts++;
-      if (attempts > 60) { clearInterval(interval); return; }
+    if (orderStatus === 'paid' || isExpired || isDraft) return;
 
+    // 🚀 ULTRA-FAST: 500ms for first 10 attempts (5 seconds), then 1s, then backing off.
+    const currentDelay = attempts < 10 ? 500 : attempts < 20 ? 1000 : attempts < 40 ? 3000 : 10000;
+
+    const interval = setTimeout(async () => {
       const tgData = window.Telegram?.WebApp?.initData || '';
-      // 🛡️ Guard: Skip polling if order is still a DRAFT (...)
-      if (!localOrder.order_code || localOrder.order_code === '...') return;
+      
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/orders/status/${localOrder.order_code}`, {
+          headers: { 'X-TG-Data': tgData }
+        });
+        const data = await res.json();
+        
+        setIsOffline(false); // Reset network failure state
+        setAttempts(prev => prev + 1);
 
-      fetch(`${BACKEND_URL}/api/orders/status/${localOrder.order_code}`, {
-        headers: { 'X-TG-Data': tgData }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            // Update local order to catch new status OR new qr_string
-            setLocalOrder(data.order);
-            if (data.status === 'paid') {
-              if (onPaymentSuccess) onPaymentSuccess();
-              clearInterval(interval);
-            }
+        if (data.success) {
+          setLocalOrder(data.order);
+          if (data.status === 'paid') {
+            if (onPaymentSuccess) onPaymentSuccess();
+            setTimeout(() => {
+              setShowReceipt(true);
+              window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+            }, 1000);
           }
-        })
-        .catch(() => {});
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [dbId, orderStatus, BACKEND_URL, onPaymentSuccess]);
+        }
+      } catch (err) {
+        console.warn('📡 Network Flickering. Retrying...');
+        setIsOffline(true);
+        setAttempts(prev => prev + 1);
+      }
+    }, currentDelay);
+
+    return () => clearTimeout(interval);
+  }, [localOrder.order_code, orderStatus, attempts, BACKEND_URL, onPaymentSuccess, isExpired]);
+
+  const handleRefreshQR = async () => {
+    setIsVerifying(true);
+    const tgData = window.Telegram?.WebApp?.initData || '';
+    try {
+      // Polling status triggers a self-healing refresh on the server if it's stale
+      const res = await fetch(`${BACKEND_URL}/api/orders/status/${localOrder.order_code}`, {
+        headers: { 'X-TG-Data': tgData }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLocalOrder(data.order);
+        setIsExpired(false);
+        setAttempts(0);
+        if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+      }
+    } catch (err) {
+      console.error("Refresh Fail:", err);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const renderReceipt = () => (
     <div className="receipt-luxury-paper animate-up">
-       <div className="receipt-header-lux">
-          <img src="/favicon.png" alt="MO MO" style={{ width: 48, height: 48, borderRadius: 12, marginBottom: 8 }} />
-          <div className="receipt-tagline-lux">BOUTIQUE LUXURY</div>
+       <div className="receipt-header-lux" style={{ marginBottom: 32 }}>
+          <div style={{ padding: '8px', background: 'white', borderRadius: '24px', boxShadow: '0 8px 16px rgba(0,0,0,0.05)', display: 'inline-block', marginBottom: 12 }}>
+            <img src="/favicon.png" alt="MO MO" style={{ width: 80, height: 80, borderRadius: '18px', display: 'block' }} />
+          </div>
+          <div className="receipt-tagline-lux" style={{ letterSpacing: 4, fontSize: 13, color: '#d4af37', fontWeight: 900 }}>MO MO BOUTIQUE LUXURY</div>
        </div>
 
        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -127,8 +177,39 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
           <div style={{ textAlign: 'right' }}>
              <div className="order-id-lux">{t('order_date')}</div>
               <div style={{ fontWeight: 950, fontSize: 13 }}>
-                {!isDraft && new Date(localOrder.created_at).toLocaleDateString(lang === 'kh' ? 'km-KH' : 'en-US')}
+                {!isDraft && new Date(localOrder.created_at).toLocaleString(lang === 'kh' ? 'km-KH' : 'en-US', {
+                   year: 'numeric',
+                   month: '2-digit',
+                   day: '2-digit',
+                   hour: '2-digit',
+                   minute: '2-digit',
+                   hour12: true
+                })}
               </div>
+          </div>
+       </div>
+
+       {/* 👤 Customer & Shipping Section */}
+       <div style={{ background: 'var(--bg-soft)', borderRadius: '16px', padding: '16px', marginBottom: 24, border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+             <div style={{ fontSize: 20 }}>👤</div>
+             <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{lang === 'kh' ? 'អតិថិជន' : 'Customer'}</div>
+                <div style={{ fontWeight: 950, fontSize: 14 }}>{localOrder.user_name}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-main)', opacity: 0.8 }}>{localOrder.phone}</div>
+             </div>
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+             <div style={{ fontSize: 20 }}>📍</div>
+             <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{lang === 'kh' ? 'អាសយដ្ឋានដឹក' : 'Shipping'}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-main)', fontWeight: 700, lineHeight: 1.4 }}>
+                   {localOrder.address}, {localOrder.province}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--primary-accent)', fontWeight: 900, marginTop: 4 }}>
+                   🚚 {localOrder.delivery_company}
+                </div>
+             </div>
           </div>
        </div>
 
@@ -143,30 +224,100 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
           ))}
        </div>
 
+       {/* 💰 Detailed Price Breakdown */}
+       <div style={{ marginTop: 32 }}>
+          <div className="order-id-lux" style={{ marginBottom: 16 }}>{lang === 'kh' ? 'សេចក្តីលម្អិតតម្លៃ' : 'Price Breakdown'}</div>
+          
+          <div className="receipt-summary-item" style={{ marginBottom: 8 }}>
+             <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>{lang === 'kh' ? 'សរុបដើម' : 'Subtotal'}</div>
+             <div style={{ fontWeight: 800 }}>${parseFloat(localOrder.subtotal || localOrder.total).toFixed(2)}</div>
+          </div>
+
+          {(parseFloat(localOrder.discount_amount) > 0) && (
+            <div className="receipt-summary-item" style={{ marginBottom: 8, color: '#ef4444' }}>
+               <div style={{ fontSize: 13, fontWeight: 700 }}>{lang === 'kh' ? 'បញ្ចុះតម្លៃ' : 'Discount'}</div>
+               <div style={{ fontWeight: 800 }}>-${parseFloat(localOrder.discount_amount).toFixed(2)}</div>
+            </div>
+          )}
+
+          <div className="receipt-summary-item" style={{ marginBottom: 16 }}>
+             <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>{lang === 'kh' ? 'ថ្លៃដឹកជញ្ជូន' : 'Delivery Fee'}</div>
+             <div style={{ fontWeight: 800 }}>{parseFloat(localOrder.delivery_fee) === 0 ? (lang === 'kh' ? 'ឥតគិតថ្លៃ' : 'Free') : `$${parseFloat(localOrder.delivery_fee).toFixed(2)}`}</div>
+          </div>
+       </div>
+
        <div className="receipt-divider-dash"></div>
 
-       <div className="receipt-total-row">
+       <div className="receipt-total-row" style={{ marginTop: 8 }}>
           <span style={{ fontSize: 18, fontWeight: 950, color: 'var(--text-bold)' }}>{t('final_total')}</span>
-          <span className="mega-price-primary" style={{ fontSize: 32 }}>${parseFloat(localOrder.total).toFixed(2)}</span>
+          <span className="mega-price-primary" style={{ fontSize: 36, color: '#d4af37' }}>${parseFloat(localOrder.total).toFixed(2)}</span>
         </div>
 
+       {/* 🆔 Serial & Information Section */}
+       <div style={{ textAlign: 'center', marginTop: 32, padding: '20px', border: '1px dashed var(--border-color)', borderRadius: '16px', background: 'var(--bg-card)' }}>
+          <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8 }}>{lang === 'kh' ? 'លេខសម្គាល់ប្រតិបត្តិការ' : 'Serial Number'}</div>
+          <div style={{ fontSize: 20, fontWeight: 950, color: 'var(--primary-accent)', letterSpacing: 1 }}>{displayId}</div>
+       </div>
+
+       {/* 📜 Terms & Conditions */}
+       <div style={{ marginTop: 32, padding: '0 8px' }}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-bold)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+             <span style={{ fontSize: 16 }}>📜</span> {lang === 'kh' ? 'លក្ខខណ្ឌផ្សេងៗ' : 'Terms & Conditions'}
+          </div>
+          <ul style={{ padding: 0, margin: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+             {[
+                lang === 'kh' ? '• ទំនិញទិញហើយមិនអាចប្តូរជាសាច់ប្រាក់វិញបានទេ។' : '• Items purchased are non-refundable.',
+                lang === 'kh' ? '• អាចប្តូរទំនិញបានក្នុងរយៈពេល ៣ ថ្ងៃ (ត្រូវមានវិក្កយបត្រ)។' : '• Exchange within 3 days (Receipt required).',
+                lang === 'kh' ? '• សូមរក្សាទុកវិក្កយបត្រនេះដើម្បីផ្ទៀងផ្ទាត់។' : '• Please keep this receipt for verification.'
+             ].map((text, i) => (
+                <li key={i} style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, lineHeight: 1.4 }}>{text}</li>
+             ))}
+          </ul>
+       </div>
+
        {/* Verification QR */}
-       <div style={{ textAlign: 'center', marginTop: 48, padding: '24px', background: 'var(--bg-soft)', borderRadius: '28px' }}>
+       <div style={{ textAlign: 'center', marginTop: 40, padding: '24px', background: 'var(--bg-soft)', borderRadius: '28px' }}>
           <img src={miniQrUrl} alt="" style={{ width: 100, height: 100, marginBottom: 12, borderRadius: 12, filter: 'contrast(1.1)' }} />
           <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5 }}>{lang === 'kh' ? 'ស្កេនដើម្បីផ្ទៀងផ្ទាត់' : 'Scan to Verify'}</div>
        </div>
 
-       <div style={{ textAlign: 'center', marginTop: 32, display: 'flex', gap: 12 }}>
-          <button 
-             onClick={() => {
-                const shareText = `🛍️ MO MO Boutique\n${t('order_id')}: #${String(displayId).substring(0, 8)}...\n${t('final_total')}: $${parseFloat(localOrder.total).toFixed(2)}`;
-                switchInlineQuery(shareText, ['users', 'chats', 'groups', 'channels']);
-             }}
-             className="detail-btn-cart-luxury"
-             style={{ flex: 2, height: 50, fontSize: 14 }}>
-             📤 {lang === 'kh' ? 'ចែករំលែក' : 'Share'}
-          </button>
-          <button onClick={() => setShowReceipt(false)} className="back-btn-pill" style={{ flex: 1, height: 50, borderRadius: 16 }}>{t('close')}</button>
+       {/* 🛡️ Trust Badges Section */}
+       <div style={{ marginTop: 40, display: 'flex', justifyContent: 'center', gap: 20, opacity: 0.8 }}>
+          <div style={{ textAlign: 'center' }}>
+             <div style={{ fontSize: 24, marginBottom: 4 }}>✅</div>
+             <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{lang === 'kh' ? 'ទំនិញសុទ្ធ' : 'Authentic'}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+             <div style={{ fontSize: 24, marginBottom: 4 }}>🛡️</div>
+             <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{lang === 'kh' ? 'សុវត្ថិភាព' : 'Secure'}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+             <div style={{ fontSize: 24, marginBottom: 4 }}>🚚</div>
+             <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{lang === 'kh' ? 'ដឹកជញ្ជូនរហ័ស' : 'Fast Delivery'}</div>
+          </div>
+       </div>
+
+       <div style={{ textAlign: 'center', marginTop: 32, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button 
+               onClick={() => {
+                  const shareText = `🛍️ MO MO Boutique\n${t('order_id')}: #${String(displayId).substring(0, 8)}...\n${t('final_total')}: $${parseFloat(localOrder.total).toFixed(2)}`;
+                  switchInlineQuery(shareText, ['users', 'chats', 'groups', 'channels']);
+               }}
+               className="detail-btn-cart-luxury"
+               style={{ flex: 1, height: 50, fontSize: 14 }}>
+               📤 {lang === 'kh' ? 'ចែករំលែក' : 'Share'}
+            </button>
+            <a 
+               href="https://t.me/momo_support" 
+               target="_blank" 
+               rel="noreferrer"
+               className="detail-btn-cart-luxury"
+               style={{ flex: 1, height: 50, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', background: 'var(--bg-soft)', color: 'var(--text-bold)' }}>
+               💬 {lang === 'kh' ? 'ជំនួយ' : 'Support'}
+            </a>
+          </div>
+          <button onClick={() => setShowReceipt(false)} className="back-btn-pill" style={{ width: '100%', height: 50, borderRadius: 16 }}>{t('close')}</button>
        </div>
     </div>
   );
@@ -180,7 +331,12 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
              <div style={{ fontSize: '70px', marginBottom: '25px' }}>⏳</div>
              <h2 style={{ fontSize: '24px', fontWeight: '950', color: 'var(--text-bold)', marginBottom: '12px' }}>{lang === 'kh' ? 'ការកុម្ម៉ង់ហួសពេល' : 'Order Expired'}</h2>
              <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: 40 }}>{lang === 'kh' ? 'សុំទោស! រយៈពេលបង់ប្រាក់ ៥ នាទីត្រូវបានបញ្ជប់។ សូមសាកល្បងម្តងទៀត។' : 'Sorry! The 5-minute payment window has closed. Please try again.'}</p>
-             <button onClick={onClose} className="detail-btn-buy-luxury" style={{ background: '#ef4444' }}>{t('close')}</button>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button onClick={handleRefreshQR} className="detail-btn-buy-luxury" disabled={isVerifying}>
+                   {isVerifying ? '...' : (lang === 'kh' ? '🔄 ធ្វើឱ្យ QR ថ្មី' : '🔄 Refresh QR')}
+                </button>
+                <button onClick={onClose} className="back-btn-pill" style={{ opacity: 0.7 }}>{t('close')}</button>
+             </div>
           </div>
         ) : orderStatus === 'paid' ? (
           showReceipt ? renderReceipt() : (
@@ -203,6 +359,11 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
              <div style={{ textAlign: 'center' }}>
                 <div className="order-id-lux" style={{ letterSpacing: 2 }}>MO MO BOUTIQUE</div>
                 <div className="khqr-amount-lux">${parseFloat(localOrder.total).toFixed(2)}</div>
+
+                {/* 📍 Quick Verification Info */}
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 20, background: 'var(--bg-soft)', display: 'inline-block', padding: '6px 16px', borderRadius: '100px' }}>
+                   {localOrder.user_name} • {localOrder.phone}
+                </div>
 
                 <div className="qr-code-wrapper-lux">
                    {dynamicQr || paymentQrUrl ? (
@@ -228,18 +389,33 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
                    )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: timeLeft < 60 ? '#ef4444' : 'var(--text-muted)', fontWeight: 950, fontSize: 18, marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: timeLeft < 60 ? '#ef4444' : 'var(--text-muted)', fontWeight: 950, fontSize: 18, marginBottom: 8 }}>
                    <span style={{ opacity: 0.6 }}>⏳</span>
                    {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                 </div>
 
+                {/* 🔍 Real-time Status Indicator with Network Awareness */}
+                <div className="animate-pulse" style={{ fontSize: '10px', color: isOffline ? '#ef4444' : 'var(--primary-accent)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <div className={isOffline ? "" : "dot-pulse"}></div>
+                  {isOffline 
+                    ? (lang === 'kh' ? 'កំពុងព្យាយាមភ្ជាប់ឡើងវិញ...' : 'Reconnecting to Secure Link...') 
+                    : (lang === 'kh' ? 'កំពុងឆែកមើលការបង់ប្រាក់ពី Bakong...' : 'Watching for Bakong Payment...')}
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                   <button onClick={onClose} className="back-btn-pill" style={{ width: '100%', height: 50, borderRadius: 16, opacity: 0.7 }}>{t('close')}</button>
+                   <button onClick={onClose} className="back-btn-pill" style={{ width: '100%', height: 40, borderRadius: 16, opacity: 0.6, fontSize: 12 }}>{t('close')}</button>
                 </div>
              </div>
           </div>
         )}
       </div>
+      <style>{`
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .dot-pulse { width: 6px; height: 6px; border-radius: 50%; background-color: var(--primary-accent); position: relative; }
+        .dot-pulse::after { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; background-color: inherit; animation: dotPulse 1.5s ease-out infinite; }
+        @keyframes dotPulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
+      `}</style>
     </div>
   );
 };

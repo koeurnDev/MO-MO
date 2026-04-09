@@ -4,12 +4,13 @@ const orderRepository = {
   create: async (o, client = pool) => {
     const res = await client.query(
       `INSERT INTO orders 
-       (user_id, user_name, items, total, qr_string, phone, address, province, note, delivery_company, payment_method, order_code, idempotency_key) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+       (user_id, user_name, items, total, qr_string, phone, address, province, note, delivery_company, payment_method, order_code, idempotency_key, expires_at, status, subtotal, discount_amount, delivery_fee, gross_total) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
       [
         o.user_id, o.user_name, o.items, o.total, o.qr_string || '', 
         o.phone, o.address, o.province, o.note, o.delivery_company, 
-        o.payment_method, o.order_code, o.idempotency_key
+        o.payment_method, o.order_code, o.idempotency_key, o.expires_at || null,
+        'pending', o.subtotal || 0, o.discount_amount || 0, o.delivery_fee || 0, o.gross_total || 0
       ]
     );
     return res.rows[0];
@@ -73,6 +74,14 @@ const orderRepository = {
     await pool.query('UPDATE orders SET qr_string = $1 WHERE id = $2', [qr, id]);
   },
 
+  updateExpiry: async (id, expiresAt) => {
+    const res = await pool.query(
+      'UPDATE orders SET expires_at = $1, status = $2 WHERE id = $3 RETURNING *',
+      [expiresAt, 'pending', id]
+    );
+    return res.rows[0];
+  },
+
   getRevenueSummary: async () => {
     const res = await pool.query("SELECT SUM(total) as total FROM orders WHERE status != 'cancelled'");
     return parseFloat(res.rows[0]?.total || 0);
@@ -106,6 +115,17 @@ const orderRepository = {
 
   getStatusDistribution: async () => {
     const res = await pool.query('SELECT status, COUNT(*) as count FROM orders GROUP BY status');
+    return res.rows;
+  },
+
+  findPendingOrders: async (lookbackHours = 24) => {
+    const res = await pool.query(
+      `SELECT * FROM orders 
+       WHERE status = 'pending' 
+       AND created_at > NOW() - (INTERVAL '1 hour' * $1)
+       ORDER BY created_at ASC`,
+      [lookbackHours]
+    );
     return res.rows;
   }
 };

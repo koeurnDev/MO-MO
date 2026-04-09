@@ -4,6 +4,7 @@
   "main": "index.js",
   "dependencies": {
     "@upstash/redis": "^1.37.0",
+    "bakong-khqr": "^1.0.20",
     "bull": "^4.16.5",
     "cloudinary": "^2.9.0",
     "compression": "^1.7.4",
@@ -18,7 +19,6 @@
     "pg": "^8.20.0",
     "redis": "^5.11.0",
     "telegraf": "^4.14.0",
-    "ts-khqr": "^2.2.2",
     "uuid": "^13.0.0"
   },
   "scripts": {

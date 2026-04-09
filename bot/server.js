@@ -3,6 +3,7 @@ const app = require('./app');
 const pool = require('./config/database');
 const { connectRedis } = require('./config/redis');
 const bot = require('./config/telegram');
+const paymentReconciler = require('./workers/paymentReconciler');
 
 // Error Handling (Global)
 process.on('uncaughtException', (err) => {
@@ -63,15 +64,22 @@ const startServer = async () => {
     console.log('⏳ Connecting to Redis...');
     connectRedis(); // No await here
 
-    // 3. Telegram Bot Start
+    // 3. Telegram Bot Start (🛡️ Hardened: Non-blocking launch)
     console.log('⏳ Launching Telegram Bot...');
-    bot.launch();
-    console.log('🤖 Bot: Launched');
+    bot.launch()
+      .then(() => console.log('🤖 Bot: Launched'))
+      .catch(botErr => {
+        console.error('⚠️ Bot Launch Warning:', botErr.message);
+        console.log('ℹ️ Server is running for Webapp API despite Bot conflict.');
+      });
 
     // 4. Express Start
     console.log('⏳ Starting Express Server...');
     app.listen(PORT, () => {
       console.log(`🚀 Server: Running on port ${PORT}`);
+      
+      // 5. 🛡️ Payment Resilience: Start Background Reconciler
+      paymentReconciler.start();
     });
   } catch (err) {
     console.error('🔴 Server Start Fail:', err.message);

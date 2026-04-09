@@ -35,6 +35,17 @@ notificationQueue.process(async (job) => {
                           `🆔 លេខសម្គាល់: \`${order.order_code}\`\n` +
                           `✅ ការបង់ប្រាក់ត្រូវបានបញ្ជាក់ជោគជ័យ! អរគុណសម្រាប់ការគាំទ្រពី MO MO Boutique។`;
         await bot.telegram.sendMessage(userId, userTicket, { parse_mode: 'Markdown' });
+      } else if (type === 'reconciliation_success') {
+        const ticket = `🔄 *ការផ្ទៀងផ្ទាត់ឡើងវិញបានជោគជ័យ (Reconciled)*\n` +
+                       `🆔 លេខសម្គាល់: \`${order.order_code}\`\n` +
+                       `👤 អតិថិជន: *${order.user_name}*\n` +
+                       `✅ ប្រព័ន្ធបានឆែកឃើញការបង់ប្រាក់ដែលបាត់ដានកាលពីមុន។ អ័រឌឺត្រូវបានបញ្ជាក់ដោយស្វ័យប្រវត្តិ!`;
+        await bot.telegram.sendMessage(adminId, ticket, { parse_mode: 'Markdown' });
+
+        const userTicket = `✨ *ការបង់ប្រាក់របស់អ្នកត្រូវបានបញ្ជាក់ (Reconciled)*\n` +
+                          `🆔 លេខសម្គាល់: \`${order.order_code}\`\n` +
+                          `✅ ប្រព័ន្ធបានឆែកឃើញការបង់ប្រាក់របស់អ្នក។ អរគុណដែលបានរង់ចាំ!`;
+        await bot.telegram.sendMessage(userId, userTicket, { parse_mode: 'Markdown' });
       }
     }
   } catch (e) {
@@ -63,6 +74,12 @@ const notificationService = {
                 `📉 ចំនួននៅសល់: *${product.stock}* គ្រឿង\n\n` +
                 `សូមប្រញាប់បន្ថែមស្តុកបាទ!`;
     await bot.telegram.sendMessage(adminId, msg, { parse_mode: 'Markdown' });
+  },
+
+  notifyReconciliationSuccess: (adminId, userId, order) => {
+    return notificationQueue.add({
+      type: 'reconciliation_success', adminId, userId, order
+    }, { attempts: 3, backoff: { type: 'exponential', delay: 2000 } });
   }
 };
 

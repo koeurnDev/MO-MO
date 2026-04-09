@@ -41,14 +41,22 @@ const orderCreationLimiter = async (req, res, next) => {
   if (!redisRest) return next();
   
   const ip = req.ip || req.socket.remoteAddress;
+
+  // 🛡️ Whitelist local development traffic
+  const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+  if (isDev && (ip === '::1' || ip === '127.0.0.1' || ip.includes('localhost'))) {
+    return next();
+  }
+
   const key = `rate:order:${ip}`;
   
   try {
     const count = await redisRest.incr(key);
     if (count === 1) await redisRest.expire(key, 600); // 10 minutes
     
-    if (count > 5) {
-      return res.status(429).json({ success: false, error: 'Too many orders. Please wait.' });
+    // 🛡️ Increased limit to 15 orders for better testing/UX flow
+    if (count > 15) {
+      return res.status(429).json({ success: false, error: 'Too many orders. Please wait 10 minutes.' });
     }
     next();
   } catch (err) {
