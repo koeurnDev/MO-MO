@@ -15,6 +15,10 @@ const marketingAutomation = {
   intervalMs: 3600000, // 1 hour
 
   start: () => {
+    if (process.env.ENABLE_PAYMENT_REMINDERS !== 'true') {
+      console.log('ℹ️ [Marketing Automation] Payment reminders disabled (manual admin review). Set ENABLE_PAYMENT_REMINDERS=true to enable.');
+      return;
+    }
     if (marketingAutomation.timer) return;
     console.log('🚀 [Marketing Automation] Background worker started (Distributed & Safe)');
 
