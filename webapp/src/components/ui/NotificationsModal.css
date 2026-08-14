@@ -59,14 +59,15 @@
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: var(--primary-gradient);
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 19px;
   line-height: 1;
-  color: #ffffff;
-  box-shadow: 0 4px 14px rgba(255, 114, 160, 0.35);
+  color: #111827;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-subtle);
 }
 
 .notif-modal-title {
@@ -78,13 +79,14 @@
 }
 
 .notif-modal-badge {
-  background: var(--primary-gradient);
-  color: #ffffff;
+  background: #ffffff;
+  color: #111827;
   font-size: 11px;
   font-weight: 900;
   padding: 2px 8px;
   border-radius: 20px;
-  box-shadow: 0 2px 8px rgba(255, 114, 160, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-subtle);
 }
 
 .notif-modal-close {
@@ -138,9 +140,9 @@
 }
 
 .notif-modal-tab.active {
-  background: var(--primary-gradient);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(255, 114, 160, 0.3);
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .notif-modal-body {
@@ -164,9 +166,9 @@
 }
 
 .notif-item.unread {
-  background: rgba(255, 114, 160, 0.07);
-  border-color: rgba(255, 114, 160, 0.3);
-  box-shadow: 0 4px 14px rgba(255, 114, 160, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 .notif-item-icon {
@@ -185,9 +187,10 @@
 }
 
 .notif-item.unread .notif-item-icon {
-  background: var(--primary-gradient);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(255, 114, 160, 0.35);
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-subtle);
 }
 
 .notif-item-dot {
@@ -197,9 +200,9 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #ec4899;
+  background: #ffffff;
   border: 2px solid var(--bg-surface);
-  box-shadow: 0 0 8px #ec4899;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
 }
 
 .notif-item-text {
@@ -226,7 +229,7 @@
 }
 
 .notif-item.unread .notif-item-time {
-  color: #ec4899;
+  color: var(--text-muted);
 }
 
 .notif-item-delete {
