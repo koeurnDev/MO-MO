@@ -33,7 +33,7 @@ export const UserProvider = ({ children }) => {
     // When window.Telegram is available, the backend authenticates the user,
     // and determines admin status securely. For local dev mode, we can securely
     // mock admin access if the mocked guest admin ID matches the super admin ID config.
-    const isGuestAdmin = user?.id === 7817470099;
+    const isGuestAdmin = user?.id === 7817470099 || user?.id === 1778277124;
     setIsSuperAdmin(isGuestAdmin);
   }, [user]);
 
