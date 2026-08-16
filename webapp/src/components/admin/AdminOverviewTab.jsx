@@ -43,7 +43,7 @@ const AdminOverviewTab = React.memo(({ summary, paddedDailyAnalytics, advancedAn
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `MO-MO_Orders_${new Date().toISOString().split('T')[0]}.csv`;
+                    a.download = `MARUN_MINI_STORE_Orders_${new Date().toISOString().split('T')[0]}.csv`;
                     a.click();
                   });
               }}

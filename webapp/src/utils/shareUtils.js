@@ -15,9 +15,9 @@ export const buildProductShareText = (product, price, lang = 'kh') => {
   const name = product?.name || '';
   const priceStr = `$${price}`;
   if (lang === 'kh') {
-    return `🔥 មើលនេះសិន! ${name} — ${priceStr} @ MO MO Boutique 👗`;
+    return `🔥 មើលនេះសិន! ${name} — ${priceStr} @ MARUN MINI STORE 👗`;
   }
-  return `🔥 Check this out! ${name} — ${priceStr} @ MO MO Boutique 👗`;
+  return `🔥 Check this out! ${name} — ${priceStr} @ MARUN MINI STORE 👗`;
 };
 
 /** Opens Telegram native share sheet with product deep link */

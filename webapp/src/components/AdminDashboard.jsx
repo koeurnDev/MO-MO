@@ -13,6 +13,7 @@ import {
   serializeBannerEntries,
   migrateBannerLinkTargets
 } from '../utils/bannerLinkUtils';
+import { formatFullAddress } from '../utils/deliveryUtils';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import '../styles/admin-dashboard.css';
 
@@ -122,7 +123,7 @@ const AdminDashboard = ({
   const [shopLogoUrl, setShopLogoUrl] = useState('');
   const [paymentQrUrl, setPaymentQrUrl] = useState('');
   const [paymentInfo, setPaymentInfo] = useState('');
-  const [receiptShopName, setReceiptShopName] = useState('MO-MO Boutique');
+  const [receiptShopName, setReceiptShopName] = useState('MARUN MINI STORE');
   const [receiptSubtitle, setReceiptSubtitle] = useState('អីវ៉ាន់បោះដុំ និងរាយ');
   const [receiptNote, setReceiptNote] = useState('សូមអរគុណសម្រាប់ការគាំទ្រ!');
   const [socialFb, setSocialFb] = useState('');
@@ -157,7 +158,7 @@ const AdminDashboard = ({
       setShopLogoUrl(s.shop_logo_url || '');
       setPaymentQrUrl(s.payment_qr_url || '');
       setPaymentInfo(s.payment_info || '');
-      setReceiptShopName(s.receipt_shop_name || 'MO-MO Boutique');
+      setReceiptShopName(s.receipt_shop_name || 'MARUN MINI STORE');
       setReceiptSubtitle(s.receipt_subtitle || 'អីវ៉ាន់បោះដុំ និងរាយ');
       setReceiptNote(s.receipt_note || 'សូមអរគុណសម្រាប់ការគាំទ្រ!');
       setSocialFb(s.social_fb || '');
@@ -756,7 +757,7 @@ const AdminDashboard = ({
                 </svg>
               </span>
               <h2 className="admin-title-pro">
-                <span className="admin-title-kh">{lang === 'kh' ? 'គ្រប់គ្រង MO-MO' : 'Manage MO-MO'}</span>
+                <span className="admin-title-kh">{lang === 'kh' ? 'គ្រប់គ្រង MARUN MINI STORE' : 'Manage MARUN MINI STORE'}</span>
               </h2>
             </div>
             <div className="admin-header-actions">
@@ -1032,7 +1033,7 @@ const PrintableOrder = ({ order, shopName, subtitle, shopNote }) => {
   return (
     <div className="printable-order">
       <div className="print-header">
-        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 950 }}>{shopName || 'MO-MO Boutique'}</h2>
+        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 950 }}>{shopName || 'MARUN MINI STORE'}</h2>
         <p style={{ margin: '5px 0', fontSize: 14 }}>{subtitle || 'អីវ៉ាន់បោះដុំ និងរាយ'}</p>
       </div>
       <div className="print-divider"></div>
@@ -1040,7 +1041,7 @@ const PrintableOrder = ({ order, shopName, subtitle, shopNote }) => {
         <div className="print-row"><span>លេខវិក្កយបត្រ:</span> <strong>{order.order_code || order.id}</strong></div>
         <div className="print-row"><span>អតិថិជន:</span> <strong>{order.user_name}</strong></div>
         <div className="print-row"><span>លេខទូរស័ព្ទ:</span> <strong>{order.phone}</strong></div>
-        {order.address && <div className="print-row"><span>ទីតាំង:</span> <strong>{order.address}{order.province ? `, ${order.province}` : ''}</strong></div>}
+        {order.address && <div className="print-row"><span>ទីតាំង:</span> <strong>{formatFullAddress(order.address, order.province)}</strong></div>}
         {order.delivery_company && <div className="print-row"><span>ក្រុមហ៊ុនដឹក:</span> <strong style={{ textTransform: 'uppercase' }}>{order.delivery_company}</strong></div>}
         {order.note && <div className="print-row"><span>ចំណាំ:</span> <strong>{order.note}</strong></div>}
       </div>

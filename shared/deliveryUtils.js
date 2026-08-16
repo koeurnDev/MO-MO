@@ -23,3 +23,29 @@ export function calculateDeliveryFee(subtotal, deliveryFeeSetting, deliveryThres
     calculateDeliveryFeeCents(toCents(subtotal), deliveryFeeSetting, deliveryThresholdSetting)
   );
 }
+
+const STALE_DEFAULT_PROVINCES = new Set(['phnom penh', 'ភ្នំពេញ']);
+
+/**
+ * Build a single display address from structured CambodiaAddress + legacy province field.
+ * CambodiaAddress already stores province at the end of `address`; avoid duplicating it.
+ */
+export function formatFullAddress(address, province) {
+  const addr = (address || '').trim();
+  const prov = (province || '').trim();
+  if (!addr) return prov;
+  if (!prov) return addr;
+
+  const addrLower = addr.toLowerCase();
+  const provLower = prov.toLowerCase();
+
+  if (STALE_DEFAULT_PROVINCES.has(provLower) && addr.includes(',')) {
+    return addr;
+  }
+
+  if (addrLower.endsWith(provLower) || addrLower.includes(`, ${provLower}`)) {
+    return addr;
+  }
+
+  return `${addr}, ${prov}`;
+}

@@ -154,7 +154,7 @@ const orderService = {
 
         const individualInfo = new IndividualInfo(
           bakongId,
-          merchantName || 'MO MO Boutique',
+          merchantName || 'MARUN MINI STORE',
           'Phnom Penh',
           optionalData
         );
@@ -182,7 +182,7 @@ const orderService = {
         qr_string: qrString,
         phone: deliveryInfo?.phone || '',
         address: deliveryInfo?.address || '',
-        province: deliveryInfo?.province || 'Phnom Penh',
+        province: deliveryInfo?.province || '',
         note: deliveryInfo?.note || '',
         delivery_company: deliveryInfo?.deliveryCompany || 'J&T Express',
         payment_method: deliveryInfo?.paymentMethod || 'Bakong KHQR',
@@ -281,7 +281,7 @@ const orderService = {
 
         const individualInfo = new IndividualInfo(
           bakongId,
-          merchantName || 'MO MO Boutique',
+          merchantName || 'MARUN MINI STORE',
           'Phnom Penh',
           optionalData
         );

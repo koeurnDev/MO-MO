@@ -33,7 +33,7 @@ const Header = ({ setView, cartCount }) => {
           textShadow: '2px 2px 0 #fff, 4px 4px 0 rgba(255, 114, 160, 0.2)',
           fontFamily: "'Bubblegum Sans', cursive"
         }}>
-          Mo MO
+          MARUN MINI STORE
         </h1>
       </div>
 

@@ -83,15 +83,22 @@ function App() {
   const [formData, setFormData] = React.useState(() => {
     try {
       const saved = localStorage.getItem('momo_shipping_info');
-      return saved ? JSON.parse(saved) : {
-        name: user?.first_name || '',
-        phone: '',
-        address: '',
-        province: 'Phnom Penh',
-        note: '',
-        postToTelegram: false,
-        deliveryCompany: 'J&T Express'
-      };
+      if (!saved) {
+        return {
+          name: user?.first_name || '',
+          phone: '',
+          address: '',
+          province: '',
+          note: '',
+          postToTelegram: false,
+          deliveryCompany: 'J&T Express'
+        };
+      }
+      const parsed = JSON.parse(saved);
+      if (parsed.address?.includes(',') && parsed.province) {
+        parsed.province = '';
+      }
+      return parsed;
     } catch (e) { return {}; }
   });
 
@@ -264,22 +271,6 @@ function App() {
     }
   };
 
-  const handleConfirmPayment = async (orderCode) => {
-    HapticFeedback?.impactOccurred('medium');
-    const result = await fetchWithRetry(`${BACKEND_URL}/api/orders/confirm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-TG-Data': window.Telegram?.WebApp?.initData || '' },
-      body: JSON.stringify({ orderCode })
-    });
-    
-    if (result.success) {
-      handlePaymentSuccess();
-      return true;
-    } else {
-      showAlert(result.error || 'Confirmation Failed');
-      return false;
-    }
-  };
   const handlePaymentSuccess = () => {
     clearCart();
     HapticFeedback?.notificationOccurred('success');
@@ -317,7 +308,6 @@ function App() {
             BACKEND_URL={BACKEND_URL} 
             onPaymentSuccess={handlePaymentSuccess}
             onCartClear={clearCart}
-            onConfirmPayment={handleConfirmPayment}
             t={t} lang={lang}
           />
         )}

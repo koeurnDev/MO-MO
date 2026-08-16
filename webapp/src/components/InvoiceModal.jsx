@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import { useTelegram } from '../context/TelegramContext';
 import { getVariantUnitMode, getCapacityLabel } from '../utils/variantUnitUtils';
 import { isPaymentConfirmed } from '../utils/orderItemUtils';
+import { formatFullAddress } from '../utils/deliveryUtils';
 
 /**
  * 🎨 Success Animation (Luxury Checkmark)
@@ -30,7 +31,7 @@ const SuccessCheckmark = () => (
  * 🧾 High-Fidelity Invoice Modal
  * Matches the "Digital Parchment" luxury design.
  */
-const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, onPaymentSuccess, onConfirmPayment, onCartClear, t, lang }) => {
+const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, onPaymentSuccess, onCartClear, t, lang }) => {
   const { switchInlineQuery, showAlert, HapticFeedback } = useTelegram();
   const [localOrder, setLocalOrder] = useState(order);
   const [timeLeft, setTimeLeft] = useState(300);
@@ -92,19 +93,6 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
     } finally {
       setIsUploadingReceipt(false);
       e.target.value = '';
-    }
-  };
-
-  const handleVerifyPayment = async () => {
-    if (localOrder?.id === 'DRAFT' || receiptUploaded || !localOrder?.order_code || !onConfirmPayment) return;
-    setIsVerifying(true);
-    try {
-      const ok = await onConfirmPayment(localOrder.order_code);
-      if (ok) {
-        setLocalOrder(prev => ({ ...prev, status: 'paid' }));
-      }
-    } finally {
-      setIsVerifying(false);
     }
   };
 
@@ -199,46 +187,42 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
     }
   }, [localOrder?.qr_string]);
 
-  // 🚀 HARDENED: Exponential Backoff Polling with Network Resilience
-  // [DISABLED BY REQUEST - MANUAL CHECK INSTEAD]
+  // 🚀 Auto-verify payment via Bakong (exponential backoff polling)
   useEffect(() => {
-    /*
-    if (orderStatus === 'paid' || isExpired || isDraft) return;
+    if (isPaymentConfirmed(orderStatus) || isExpired || isDraft || receiptUploaded || !localOrder?.order_code) return;
 
-    const currentDelay = attempts < 10 ? 500 : attempts < 20 ? 1000 : attempts < 40 ? 3000 : 10000;
+    const currentDelay = attempts < 8 ? 3000 : attempts < 16 ? 5000 : 10000;
 
-    const interval = setTimeout(async () => {
+    const timeout = setTimeout(async () => {
       const tgData = window.Telegram?.WebApp?.initData || '';
-      
+
       try {
         const res = await fetch(`${BACKEND_URL}/api/orders/status/${localOrder.order_code}`, {
           headers: { 'X-TG-Data': tgData }
         });
         const data = await res.json();
-        
+
         setIsOffline(false);
         setAttempts(prev => prev + 1);
 
         if (data.success) {
           setLocalOrder(data.order);
-          if (data.status === 'paid') {
+          const paid = data.status === 'paid' || data.order?.status === 'paid';
+          if (paid) {
             if (onPaymentSuccess) onPaymentSuccess();
-            setTimeout(() => {
-              setShowReceipt(true);
-              window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
-            }, 1000);
+            HapticFeedback?.notificationOccurred('success');
+            setTimeout(() => setShowReceipt(true), 800);
           }
         }
       } catch (err) {
-        console.warn('📡 Network Flickering. Retrying...');
+        console.warn('📡 Payment poll retry...', err.message);
         setIsOffline(true);
         setAttempts(prev => prev + 1);
       }
     }, currentDelay);
 
-    return () => clearTimeout(interval);
-    */
-  }, [localOrder.order_code, orderStatus, attempts, BACKEND_URL, onPaymentSuccess, isExpired]);
+    return () => clearTimeout(timeout);
+  }, [localOrder?.order_code, orderStatus, attempts, BACKEND_URL, onPaymentSuccess, isExpired, isDraft, receiptUploaded, HapticFeedback]);
 
   const handleRefreshQR = async () => {
     setIsVerifying(true);
@@ -271,9 +255,9 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
         {/* ── HEADER ── */}
         <div style={{ textAlign: 'center', padding: '20px 18px 14px', borderBottom: '1px dashed #e2e8f0' }}>
           <div style={{ display: 'inline-block', padding: 6, background: '#f8fafc', borderRadius: 16, marginBottom: 8 }}>
-            <img src={logoDataUrl || "/favicon.png"} alt="MO MO" crossOrigin="anonymous" style={{ width: 44, height: 44, borderRadius: 10, display: 'block' }} />
+            <img src={logoDataUrl || "/favicon.png"} alt="MARUN MINI STORE" crossOrigin="anonymous" style={{ width: 44, height: 44, borderRadius: 10, display: 'block' }} />
           </div>
-          <div style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', letterSpacing: 2 }}>MO MO BOUTIQUE</div>
+          <div style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', letterSpacing: 2 }}>MARUN MINI STORE</div>
           <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, marginTop: 2 }}>
             {!isDraft && (() => {
               const d = new Date(localOrder.created_at);
@@ -306,7 +290,7 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
           {[
             { label: lang === 'kh' ? 'អតិថិជន' : 'Customer', value: localOrder.user_name || 'Guest' },
             { label: lang === 'kh' ? 'ទូរស័ព្ទ' : 'Phone', value: localOrder.phone || '—' },
-            { label: lang === 'kh' ? 'អាសយដ្ឋាន' : 'Address', value: `${localOrder.address || ''}${localOrder.province ? ', ' + localOrder.province : ''}` },
+            { label: lang === 'kh' ? 'អាសយដ្ឋាន' : 'Address', value: formatFullAddress(localOrder.address, localOrder.province) || '—' },
             localOrder.delivery_company ? { label: lang === 'kh' ? 'ក្រុមហ៊ុនដឹក' : 'Courier', value: `🚚 ${localOrder.delivery_company}` } : null,
           ].filter(Boolean).map((row, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
@@ -498,7 +482,7 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
             </div>
 
             <div className="khqr-body">
-              <div className="khqr-shop-name order-id-lux">MO MO BOUTIQUE</div>
+              <div className="khqr-shop-name order-id-lux">MARUN MINI STORE</div>
               <div className="khqr-amount-lux">${parseFloat(localOrder.total).toFixed(2)}</div>
 
               <div className="khqr-meta-pill">
@@ -565,15 +549,23 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
                     </div>
                   )}
 
-                  {!receiptUploaded ? (
-                    <div className="khqr-info-box">
-                      {lang === 'kh'
-                        ? '① ស្កេន QR បង់ប្រាក់ → ② ចុច "ដាក់វិក្កយបត្របញ្ជាក់" ខាងក្រោម (កុំផ្ញើតែក្នុង chat) → ③ រង់ចាំ Admin បញ្ជាក់។'
-                        : '① Scan QR to pay → ② Tap "Upload Receipt" below (don\'t only DM admin) → ③ Wait for admin confirmation.'}
+                  {!receiptUploaded && !isDraft && (
+                    <div className="khqr-verify-options">
+                      <p className="khqr-verify-hint">
+                        {lang === 'kh' ? '① ស្កេន QR រួចបង់ប្រាក់' : '① Scan QR and pay'}
+                      </p>
+                      <label className="khqr-upload-btn">
+                        {isUploadingReceipt
+                          ? (lang === 'kh' ? '⌛ កំពុងផ្ទុក...' : '⌛ Uploading...')
+                          : (lang === 'kh' ? '📥 ដាក់ Screenshot បង់ប្រាក់' : '📥 Upload payment screenshot')}
+                        <input type="file" accept="image/*" style={{ display: 'none' }} disabled={isUploadingReceipt} onChange={handleReceiptUpload} />
+                      </label>
                     </div>
-                  ) : (
+                  )}
+
+                  {receiptUploaded && (
                     <div style={{ fontSize: '12px', color: '#10b981', fontWeight: 800, marginBottom: 14, textAlign: 'center', lineHeight: 1.4, background: 'rgba(16, 185, 129, 0.1)', padding: '10px 14px', borderRadius: 12 }}>
-                      {lang === 'kh' ? '✅ ទទួលបានជោគជ័យ! អរគុណសម្រាប់ការបង់ប្រាក់។ ក្រុមការងារយើងខ្ញុំកំពុងពិនិត្យ និងរៀបចំការកម្ម៉ង់ជូនលោកអ្នក។' : '✅ Received Successfully! Thank you for your payment. Our team is verifying and preparing your order.'}
+                      {lang === 'kh' ? '✅ ទទួល Screenshot រួច! ក្រុមការងារកំពុងពិនិត្យ — សូមរង់ចាំការបញ្ជាក់។' : '✅ Screenshot received! Our team is reviewing — please wait for confirmation.'}
                     </div>
                   )}
 
@@ -582,27 +574,6 @@ const InvoiceModal = ({ order, onClose, paymentQrUrl, paymentInfo, BACKEND_URL, 
                       <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: 900, textAlign: 'center', background: 'rgba(239, 68, 68, 0.1)', padding: 8, borderRadius: 10 }}>
                         ⚠️ {uploadError}
                       </div>
-                    )}
-                    {!receiptUploaded && (
-                      <>
-                        <label className="khqr-upload-btn">
-                          {isUploadingReceipt ? (lang === 'kh' ? '⌛ កំពុងផ្ទុក...' : '⌛ Uploading...') : (lang === 'kh' ? '📥 ដាក់វិក្កយបត្របញ្ជាក់ (Screenshot)' : '📥 Upload Payment Screenshot')}
-                          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={isUploadingReceipt || receiptUploaded} onChange={handleReceiptUpload} />
-                        </label>
-                        {onConfirmPayment && (
-                          <button
-                            type="button"
-                            className="khqr-close-btn"
-                            style={{ marginTop: 8, background: 'rgba(16, 185, 129, 0.12)', color: '#059669', fontWeight: 800 }}
-                            disabled={isVerifying}
-                            onClick={handleVerifyPayment}
-                          >
-                            {isVerifying
-                              ? (lang === 'kh' ? '⌛ កំពុងពិនិត្យ...' : '⌛ Checking...')
-                              : (lang === 'kh' ? '✅ បង់រួច (Bakong Auto-check)' : '✅ I Paid (Bakong Auto-check)')}
-                          </button>
-                        )}
-                      </>
                     )}
                     <button onClick={onClose} className="khqr-close-btn">{lang === 'kh' ? 'បិទ' : 'Close'}</button>
                   </div>

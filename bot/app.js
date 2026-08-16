@@ -84,10 +84,13 @@ app.use(cors({
     if (isDev) {
       allowed.push(
         'http://localhost:5173', 'http://127.0.0.1:5173',
+        'http://localhost:5174', 'http://127.0.0.1:5174',
         'http://localhost:5175', 'http://127.0.0.1:5175',
         'http://localhost:3000', 'http://127.0.0.1:3000'
       );
     }
+
+    const isLocalhostDev = isDev && origin && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
 
     // 🛠️ Dev: Allow all private network IPs (192.168.x.x, 10.x.x.x) for mobile testing
     const isPrivateNetwork = isDev && origin && (
@@ -96,7 +99,7 @@ app.use(cors({
       /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/.test(origin)
     );
 
-    if (!origin || allowed.includes(origin) || isPrivateNetwork) {
+    if (!origin || allowed.includes(origin) || isPrivateNetwork || isLocalhostDev) {
       callback(null, true);
     } else {
       console.warn(`⚠️ CORS blocked origin: ${origin}`);

@@ -5,7 +5,8 @@ import {
   parseDeliverySetting,
   calculateDeliveryFee,
   calculateDeliveryFeeCents,
-  toCents
+  toCents,
+  formatFullAddress
 } from '../deliveryUtils.js';
 
 describe('discountUtils', () => {
@@ -57,5 +58,18 @@ describe('deliveryUtils', () => {
 
   it('always free when fee setting is 0', () => {
     assert.equal(calculateDeliveryFee(5, 0, 50), 0);
+  });
+
+  it('returns CambodiaAddress string without stale Phnom Penh suffix', () => {
+    const addr = 'dd, អូរញ្ញា, បឹងព្រីង, ថ្មគោល, បាត់ដំបង';
+    assert.equal(formatFullAddress(addr, 'Phnom Penh'), addr);
+  });
+
+  it('appends legacy province when address is street only', () => {
+    assert.equal(formatFullAddress('House 12A', 'Siem Reap'), 'House 12A, Siem Reap');
+  });
+
+  it('avoids duplicate province in address', () => {
+    assert.equal(formatFullAddress('House 12A, Siem Reap', 'Siem Reap'), 'House 12A, Siem Reap');
   });
 });

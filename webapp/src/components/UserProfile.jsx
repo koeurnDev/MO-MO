@@ -191,7 +191,7 @@ const UserProfile = ({ user, setView, BACKEND_URL, onViewInvoice, t, lang, toggl
       </div>
 
       <ProfileCard 
-        name={`${user?.first_name || 'MO MO LOVER'} ${user?.last_name || ''}`}
+        name={`${user?.first_name || 'MARUN MINI STORE LOVER'} ${user?.last_name || ''}`}
         role={`Premium Member #${String(user?.id).slice(-4)}`}
         imageUrl={user?.photo_url || `https://ui-avatars.com/api/?name=${user?.first_name || 'User'}&background=random`}
       />

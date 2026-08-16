@@ -26,7 +26,7 @@ const broadcastRepository = {
       if (res.rows.length === 0) {
         return [{
           id: 'welcome-system-notice',
-          message: '🎉 ស្វាគមន៍មកកាន់ MO MO BOUTIQUE! 🛍️✨\nសូមរីករាយជាមួយការទិញទំនិញសម្លៀកបំពាក់ និងផលិតផលសម្រស់គុណភាពខ្ពស់ ជាមួយសេវាកម្មដឹកជញ្ជូនរហ័សទូទាំងប្រទេស! 🚚',
+          message: '🎉 ស្វាគមន៍មកកាន់ MARUN MINI STORE! 🛍️✨\nសូមរីករាយជាមួយការទិញទំនិញសម្លៀកបំពាក់ និងផលិតផលសម្រស់គុណភាពខ្ពស់ ជាមួយសេវាកម្មដឹកជញ្ជូនរហ័សទូទាំងប្រទេស! 🚚',
           photo_url: '',
           created_at: new Date().toISOString()
         }];

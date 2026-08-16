@@ -238,9 +238,9 @@ router.post('/orders/status', isAdmin, async (req, res) => {
     if (updated.user_id && bot) {
       const displayId = updated.order_code || `#MO-${orderId}`;
       let msg = '';
-      if (status === 'processing') msg = `📦 *ការកម្ម៉ង់ ${displayId}*: ហាង MO MO Boutique កំពុង *រៀបចំអីវ៉ាន់* របស់បងហើយ!`;
-      if (status === 'shipped') {
-        msg = `✨ *ការកម្ម៉ង់ ${displayId}*: *អីវ៉ាន់បានចេញ* ពីហាង MO MO Boutique ហើយ!`;
+      if (status === 'processing') msg = `📦 *ការកម្ម៉ង់ ${displayId}*: ហាង MARUN MINI STORE កំពុង *រៀបចំអីវ៉ាន់* របស់បងហើយ!`;
+      else if (status === 'shipped') {
+        msg = `✨ *ការកម្ម៉ង់ ${displayId}*: *អីវ៉ាន់បានចេញ* ពីហាង MARUN MINI STORE ហើយ!`;
         if (updated.tracking_number) msg += `\n📦 លេខតាមដាន (Tracking): \`${updated.tracking_number}\``;
       }
       if (status === 'delivering') {
@@ -298,7 +298,7 @@ router.post('/orders/confirm', isAdmin, async (req, res) => {
     
     if (updated.user_id && bot) {
        const displayId = updated.order_code || `#MO-${orderId}`;
-       bot.telegram.sendMessage(updated.user_id, `✅ ការបង់ប្រាក់សម្រាប់ ${displayId} ត្រូវបានបញ្ជាក់! អរគុណសម្រាប់ការគាំទ្រពី MO MO Boutique។`).catch(e => console.error(e));
+       bot.telegram.sendMessage(updated.user_id, `✅ ការបង់ប្រាក់សម្រាប់ ${displayId} ត្រូវបានបញ្ជាក់! អរគុណសម្រាប់ការគាំទ្រពី MARUN MINI STORE។`).catch(e => console.error(e));
        
        // 🎫 Order Ticket for Admin Records
        if (process.env.SUPERADMIN_ID) {

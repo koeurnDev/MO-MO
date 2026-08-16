@@ -1,6 +1,7 @@
 const { Telegraf, Markup } = require('telegraf');
 const pool = require('./database');
 const { HttpsProxyAgent } = require('https-proxy-agent');
+const { formatFullAddress } = require('../utils/deliveryUtils');
 
 if (!process.env.BOT_TOKEN) {
   console.error('🔴 BOT_TOKEN is missing. Bot cannot start.');
@@ -35,7 +36,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN, telegrafOptions);
 
 // 1. Start Command
 bot.start((ctx) => {
-  ctx.reply(`សួស្តី ${escapeMarkdown(ctx.from.first_name)}! សូមស្វាគមន៍មកកាន់ MO MO Boutique 🛍️\n\nសូមចុចប៊ូតុងខាងក្រោមដើម្បីចូលមើលទំនិញថ្មីៗ`, 
+  ctx.reply(`សួស្តី ${escapeMarkdown(ctx.from.first_name)}! សូមស្វាគមន៍មកកាន់ MARUN MINI STORE 🛍️\n\nសូមចុចប៊ូតុងខាងក្រោមដើម្បីចូលមើលទំនិញថ្មីៗ`, 
     Markup.inlineKeyboard([
       [Markup.button.webApp('Shop Now 🛍️', process.env.WEBAPP_URL)],
       [Markup.button.callback('មើលការកម្ម៉ង់ / Orders 📦', 'view_orders')]
@@ -163,7 +164,7 @@ bot.action(/^track_order_(.+)$/, async (ctx) => {
     if (order.phone) {
       detailMsg += `📞 *លេខទូរស័ព្ទ៖* \`${escapeMarkdown(order.phone)}\`\n`;
     }
-    const fullAddress = [order.address, order.province].filter(Boolean).map(escapeMarkdown).join(', ');
+    const fullAddress = formatFullAddress(order.address, order.province);
     if (fullAddress) {
       detailMsg += `📍 *អាសយដ្ឋាន៖* ${fullAddress}\n`;
     }

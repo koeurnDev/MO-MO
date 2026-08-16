@@ -25,6 +25,8 @@ export const ShopProvider = ({ children }) => {
       localStorage.removeItem('momo_cache_init_v2');
       localStorage.removeItem('momo_cache_init_v3');
       localStorage.removeItem('momo_cache_init_v4');
+      localStorage.removeItem('momo_cache_init_v5');
+      localStorage.removeItem('momo_cache_init_v6');
       localStorage.removeItem('momo_broken_images');
       localStorage.removeItem('momo_broken_images_v2');
     } catch { /* ignore */ }
@@ -75,7 +77,7 @@ export const ShopProvider = ({ children }) => {
   const [shopPhone, setShopPhone] = useState('');
   const [shopAddress, setShopAddress] = useState('');
   const [shopHours, setShopHours] = useState('');
-  const [shopName, setShopName] = useState('MO MO Boutique');
+  const [shopName, setShopName] = useState('MARUN MINI STORE');
 
   const showToast = useCallback((message) => {
     setToast(message);

@@ -5,6 +5,7 @@ import { useUser } from '../../context/UserContext';
 import { useTelegram } from '../../context/TelegramContext';
 import { getOptimizedThumbUrl, resolveItemImageUrl } from '../../utils/imageUtils';
 import { extractOrderItemSpecs, formatSpecsForCopy, getVariantLabels } from '../../utils/orderItemUtils';
+import { formatFullAddress } from '../../utils/deliveryUtils';
 
 const BADGE_THEMES = {
   size: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
@@ -428,7 +429,7 @@ const AdminOrdersTab = React.memo(({
           items = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []);
         } catch (e) {}
 
-        const fullAddr = [o.address, o.province].filter(Boolean).join(', ');
+        const fullAddr = formatFullAddress(o.address, o.province);
 
         const orderTime = new Date(o.created_at || Date.now());
         const now = new Date();

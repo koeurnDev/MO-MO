@@ -1,9 +1,10 @@
 import {
   parseDeliverySetting,
-  calculateDeliveryFee
+  calculateDeliveryFee,
+  formatFullAddress
 } from '@shared/deliveryUtils.js';
 
-export { parseDeliverySetting, calculateDeliveryFee };
+export { parseDeliverySetting, calculateDeliveryFee, formatFullAddress };
 
 export function isAlwaysFreeDelivery(deliveryFeeSetting) {
   return parseDeliverySetting(deliveryFeeSetting, 1.5) <= 0;

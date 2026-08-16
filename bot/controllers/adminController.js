@@ -4,6 +4,7 @@ const productRepository = require('../repositories/productRepository');
 const settingsRepository = require('../repositories/settingsRepository');
 const couponRepository = require('../repositories/couponRepository');
 const uploadService = require('../services/uploadService');
+const { formatFullAddress } = require('../utils/deliveryUtils');
 
 const adminController = {
   getSummary: async (req, res) => {
@@ -446,7 +447,7 @@ const adminController = {
         if (updated.phone) {
           msg += `📞 *លេខទូរស័ព្ទ៖* \`${updated.phone}\`\n`;
         }
-        const fullAddr = [updated.address, updated.province].filter(Boolean).join(', ');
+        const fullAddr = formatFullAddress(updated.address, updated.province);
         if (fullAddr) {
           msg += `📍 *អាសយដ្ឋាន៖* ${fullAddr}\n`;
         }
@@ -487,7 +488,7 @@ const adminController = {
           const bot = require('../config/telegram');
           if (bot && bot.telegram) {
             await bot.telegram.sendPhoto(req.user.user_id, url, {
-              caption: `🧾 *វិក្កយបត្រ MO MO BOUTIQUE*\n\nសូមអរគុណសម្រាប់ការគាំទ្រ! វិក្កយបត្ររបស់អ្នកត្រូវបានរក្សាទុកជោគជ័យ។`,
+              caption: `🧾 *វិក្កយបត្រ MARUN MINI STORE*\n\nសូមអរគុណសម្រាប់ការគាំទ្រ! វិក្កយបត្ររបស់អ្នកត្រូវបានរក្សាទុកជោគជ័យ។`,
               parse_mode: 'Markdown'
             });
           }

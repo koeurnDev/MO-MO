@@ -4,6 +4,7 @@ import { formatCategory } from '../utils/langUtils';
 import { getVariantUnitMode, getCapacityLabel, getSelectionPrompt } from '../utils/variantUnitUtils';
 import { parseProductSections, isSkincareProduct } from '../utils/productContentUtils';
 import { useShopState } from '../context/ShopContext';
+import { useTelegram } from '../context/TelegramContext';
 
 import ImageLightboxModal from './ui/ImageLightboxModal';
 import { shareProduct } from '../utils/shareUtils';
@@ -30,6 +31,12 @@ const ProductDetail = ({ product, allProducts = [], onAdd, onClose, onBuyNow, ac
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [activeTab, setActiveTab] = useState('description');
   const { shopName } = useShopState();
+  const { showAlert, HapticFeedback } = useTelegram();
+
+  const notifyUser = (message) => {
+    HapticFeedback?.notificationOccurred('warning');
+    showAlert(message);
+  };
 
   const scrollRef = React.useRef(null);
   const mainScrollRef = React.useRef(null);
@@ -109,11 +116,11 @@ const ProductDetail = ({ product, allProducts = [], onAdd, onClose, onBuyNow, ac
         const tg = window.Telegram?.WebApp;
         if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       } else {
-        alert(data.error || 'Failed to submit review');
+        notifyUser(data.error || 'Failed to submit review');
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to submit review. Please try again.');
+      notifyUser('Failed to submit review. Please try again.');
     } finally {
       setSubmittingReview(false);
     }
@@ -184,7 +191,7 @@ const ProductDetail = ({ product, allProducts = [], onAdd, onClose, onBuyNow, ac
   const handleBuyNow = (e) => {
     e.stopPropagation();
     if (isSelectionIncomplete) {
-      alert(getSelectionPrompt(lang, {
+      notifyUser(getSelectionPrompt(lang, {
         unitMode,
         needsCapacity: uniqueSizes.length > 0 && !selectedSize,
         needsColor: uniqueColors.length > 0 && !selectedColor
@@ -192,7 +199,7 @@ const ProductDetail = ({ product, allProducts = [], onAdd, onClose, onBuyNow, ac
       return;
     }
     if (actualStock > 0 && quantity > actualStock) {
-      alert(lang === 'kh' ? `សុំទោស! ទំនិញនេះមានក្នុងស្តុកតែ ${actualStock} ប៉ុណ្ណោះ` : `Sorry, only ${actualStock} in stock`);
+      notifyUser(lang === 'kh' ? `សុំទោស! ទំនិញនេះមានក្នុងស្តុកតែ ${actualStock} ប៉ុណ្ណោះ` : `Sorry, only ${actualStock} in stock`);
       return;
     }
 
@@ -206,7 +213,7 @@ const ProductDetail = ({ product, allProducts = [], onAdd, onClose, onBuyNow, ac
   const handleAdd = (e) => {
     if (isOutOfStock) return;
     if (isSelectionIncomplete) {
-      alert(getSelectionPrompt(lang, {
+      notifyUser(getSelectionPrompt(lang, {
         unitMode,
         needsCapacity: uniqueSizes.length > 0 && !selectedSize,
         needsColor: uniqueColors.length > 0 && !selectedColor
@@ -373,7 +380,7 @@ const ProductDetail = ({ product, allProducts = [], onAdd, onClose, onBuyNow, ac
                 <div className="pd-header-top">
                   <div className="pd-header-main">
                     <span className="pd-brand-label">
-                      {formatCategory(displayProduct.category, lang) || shopName || 'MoMo'}
+                      {formatCategory(displayProduct.category, lang) || shopName || 'MARUN MINI STORE'}
                     </span>
                     <div className="pd-title-price-row">
                       <h1 className="pd-name">{product.name}</h1>

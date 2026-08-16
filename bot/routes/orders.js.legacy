@@ -51,7 +51,7 @@ notificationQueue.process(async (job) => {
 
         const userTicket = `✨ *វិក្កយបត្រកម្មង់ដែលបានបង់ប្រាក់*\n` +
                           `🆔 លេខសម្គាល់: \`${order.order_code}\`\n` +
-                          `✅ ការបង់ប្រាក់ត្រូវបានបញ្ជាក់ជោគជ័យ! អរគុណសម្រាប់ការគាំទ្រពី MO MO Boutique។`;
+                          `✅ ការបង់ប្រាក់ត្រូវបានបញ្ជាក់ជោគជ័យ! អរគុណសម្រាប់ការគាំទ្រពី MARUN MINI STORE។`;
         await bot.telegram.sendMessage(userId, userTicket, { parse_mode: 'Markdown' });
       }
     }
@@ -437,7 +437,7 @@ router.post('/review', verifyUser, async (req, res) => {
     const review = await submitReview({
       productId,
       userId,
-      userName: userName || req.tgUser.first_name || 'MO MO Lover',
+      userName: userName || req.tgUser.first_name || 'MARUN MINI STORE Lover',
       rating: parseInt(rating),
       comment: comment || ''
     });

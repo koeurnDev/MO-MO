@@ -1,5 +1,6 @@
 const Queue = require('bull');
 const bot = require('../config/telegram');
+const { formatFullAddress } = require('../utils/deliveryUtils');
 
 // 🛡️ Markdown V1 Escape Helper to prevent 400 Bad Request Telegram API crashes
 const escapeMarkdown = (text) => {
@@ -50,7 +51,7 @@ const sendTelegramNotification = async (type, adminId, userId, order, items = []
   if (!bot) return;
 
   const itemsList = (items || []).map(it => `- ${escapeMarkdown(it.name)} x ${it.quantity}`).join('\n');
-  const timeStr = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh', hour12: true });
+  const timeStr = new Date(order?.created_at || Date.now()).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh', hour12: true });
   const safeOrderCode = escapeMarkdown(order?.order_code || order?.id);
   const safeUserName = escapeMarkdown(order?.user_name || 'អតិថិជន');
   const safeTotal = order?.total || '0';
@@ -100,9 +101,9 @@ const sendTelegramNotification = async (type, adminId, userId, order, items = []
       if (order?.phone) {
         userTicket += `📞 *លេខទូរស័ព្ទ៖* \`${escapeMarkdown(order.phone)}\`\n`;
       }
-      const fullAddr = [order?.address, order?.province].filter(Boolean).map(escapeMarkdown).join(', ');
+      const fullAddr = formatFullAddress(order?.address, order?.province);
       if (fullAddr) {
-        userTicket += `📍 *អាសយដ្ឋាន៖* ${fullAddr}\n`;
+        userTicket += `📍 *អាសយដ្ឋាន៖* ${escapeMarkdown(fullAddr)}\n`;
       }
       if (order?.note) {
         userTicket += `📝 *ចំណាំ៖* ${escapeMarkdown(order.note)}\n`;
