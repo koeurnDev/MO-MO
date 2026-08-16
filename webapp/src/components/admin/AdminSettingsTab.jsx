@@ -17,7 +17,7 @@ const AdminSettingsTab = React.memo(({
   deliveryFee, setDeliveryFee, deliveryThreshold, setDeliveryThreshold,
   promoBannerUrl, removeBanner, handleBannerUpload, updateBannerProduct, products, categories,
   shopLogoUrl, handleLogoUpload,
-  paymentQrUrl, handleQrUpload, paymentInfo, setPaymentInfo,
+  paymentQrUrl, handleQrUpload, paymentInfo, setPaymentInfo, bakongAccountId, setBakongAccountId,
   receiptShopName, setReceiptShopName,
   receiptSubtitle, setReceiptSubtitle,
   receiptNote, setReceiptNote,
@@ -299,6 +299,19 @@ const AdminSettingsTab = React.memo(({
           </div>
         </div>
         <div className="admin-responsive-grid" style={{ gap: 16, marginBottom: 15 }}>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 900, marginBottom: 8, opacity: 0.7 }}>លេខសម្គាល់គណនីបាគង (Bakong KHQR ID)</label>
+            <input
+              type="text"
+              className="input-glass-admin"
+              style={{ fontSize: 13, height: 44, padding: '0 15px' }}
+              value={bakongAccountId}
+              onChange={(e) => setBakongAccountId(e.target.value)}
+              onBlur={() => updateSettingValue('bakong_account_id', bakongAccountId)}
+              placeholder="ឧ. seab_koeurn@bkrt"
+            />
+            <div style={{ fontSize: 10, opacity: 0.5, marginTop: 5 }}>ប្រើសម្រាប់បង្កើត KHQR ស្វ័យប្រវត្តិ</div>
+          </div>
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 900, marginBottom: 8, opacity: 0.7 }}>រូបភាព QR (KHQR)</label>
             <label className="upload-zone-luxury" style={{ height: 120 }}>

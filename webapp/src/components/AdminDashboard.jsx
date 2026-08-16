@@ -122,6 +122,7 @@ const AdminDashboard = ({
   const [promoBannerUrl, setPromoBannerUrl] = useState('');
   const [shopLogoUrl, setShopLogoUrl] = useState('');
   const [paymentQrUrl, setPaymentQrUrl] = useState('');
+  const [bakongAccountId, setBakongAccountId] = useState('');
   const [paymentInfo, setPaymentInfo] = useState('');
   const [receiptShopName, setReceiptShopName] = useState('MARUN MINI STORE');
   const [receiptSubtitle, setReceiptSubtitle] = useState('អីវ៉ាន់បោះដុំ និងរាយ');
@@ -157,6 +158,7 @@ const AdminDashboard = ({
       setPromoBannerUrl(s.promo_banner_url || '');
       setShopLogoUrl(s.shop_logo_url || '');
       setPaymentQrUrl(s.payment_qr_url || '');
+      setBakongAccountId(s.bakong_account_id || '');
       setPaymentInfo(s.payment_info || '');
       setReceiptShopName(s.receipt_shop_name || 'MARUN MINI STORE');
       setReceiptSubtitle(s.receipt_subtitle || 'អីវ៉ាន់បោះដុំ និងរាយ');
@@ -555,6 +557,7 @@ const AdminDashboard = ({
         if (key === 'delivery_threshold') setGlobalDeliveryThreshold(value);
         if (key === 'shop_logo_url') setGlobalShopLogoUrl(value);
         if (key === 'payment_qr_url') setPaymentQrUrl(value);
+        if (key === 'bakong_account_id') setBakongAccountId(value);
         if (key === 'payment_info') setPaymentInfo(value);
         refetchShopData(true);
         return true;
@@ -876,6 +879,8 @@ const AdminDashboard = ({
 
           {activeTab === 'settings' && (
             <AdminSettingsTab
+              bakongAccountId={bakongAccountId}
+              setBakongAccountId={setBakongAccountId}
               shopStatus={shopStatus}
               showConfirm={showConfirm}
               setShopStatus={setShopStatus}

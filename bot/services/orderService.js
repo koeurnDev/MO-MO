@@ -140,7 +140,7 @@ const orderService = {
 
       // 4. KHQR Generation
       let qrString = '';
-      const bakongId = process.env.MERCHANT_BAKONG_ID || dbSettings.bakong_account_id;
+      const bakongId = dbSettings.bakong_account_id || process.env.MERCHANT_BAKONG_ID;
       const merchantName = process.env.BAKONG_MERCHANT_NAME || dbSettings.bakong_merchant_name;
       
       if (bakongId && bakongId.trim() !== '') {
@@ -267,7 +267,7 @@ const orderService = {
 
   async generateQR(order) {
     try {
-      const bakongId = process.env.MERCHANT_BAKONG_ID || await settingsRepository.get('bakong_account_id');
+      const bakongId = await settingsRepository.get('bakong_account_id') || process.env.MERCHANT_BAKONG_ID;
       const merchantName = process.env.BAKONG_MERCHANT_NAME || await settingsRepository.get('bakong_merchant_name');
 
       if (bakongId && bakongId.trim() !== '') {

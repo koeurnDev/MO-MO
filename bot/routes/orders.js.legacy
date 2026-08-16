@@ -358,7 +358,7 @@ router.post('/', orderRateLimiter, verifyUser, async (req, res) => {
 
     // --- Post-Commit Logic (QR, Notifications) ---
     try {
-      const bakongId = process.env.MERCHANT_BAKONG_ID || (await pool.query("SELECT value FROM settings WHERE key = 'bakong_account_id'")).rows[0]?.value;
+      const bakongId = (await pool.query("SELECT value FROM settings WHERE key = 'bakong_account_id'")).rows[0]?.value || process.env.MERCHANT_BAKONG_ID;
       const merchantName = process.env.BAKONG_MERCHANT_NAME || (await pool.query("SELECT value FROM settings WHERE key = 'bakong_merchant_name'")).rows[0]?.value;
       
       const qrResult = KHQR.generate({
